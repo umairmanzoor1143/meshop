@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "meshop",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["-C", "/Volumes/external-umair/Development/client/onra/meshop", "exec", "next", "dev", "-p", "3007"],
+      "port": 3007
+    }
+  ]
+}
