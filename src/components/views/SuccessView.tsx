@@ -29,10 +29,10 @@ export function SuccessView() {
       <div className="flex justify-center mb-6">
         <CircleCheck width={48} strokeWidth={1.2} className="text-brand-green" />
       </div>
-      <h1 className="font-serif text-3xl lg:text-4xl tracking-tight text-brand-ink font-light mb-4">
+      <h1 className="font-serif text-3xl lg:text-4xl tracking-tight text-brand-ink font-normal mb-4">
         {t.successTitle}
       </h1>
-      <p className="text-sm font-light text-brand-gray leading-relaxed max-w-md mx-auto mb-10">{t.successText}</p>
+      <p className="text-sm font-normal text-brand-gray leading-relaxed max-w-md mx-auto mb-10">{t.successText}</p>
 
       {order && (
         <div className="bg-card border border-border rounded-md p-6 text-left mb-10">

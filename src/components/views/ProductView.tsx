@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Heart, Leaf, Store, ShieldCheck, Check } from "lucide-react";
 import { toast } from "sonner";
@@ -21,6 +21,9 @@ import { PriceTag } from "@/components/PriceTag";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
 import { QuantityStepper } from "@/components/QuantityStepper";
+import { useShopData } from "@/context/ShopDataContext";
+import { fetchProduct } from "@/lib/clientShop";
+import { PageLoading, PageError } from "@/components/PageState";
 import {
   Accordion,
   AccordionContent,
@@ -51,7 +54,49 @@ function fmtDate(iso?: string): string {
   return `${p(d.getUTCDate())}.${p(d.getUTCMonth() + 1)}.${d.getUTCFullYear()}`;
 }
 
-export function ProductView({
+export function ProductView({ id }: { id: string }) {
+  const { bundle, loading: bundleLoading, error: bundleError } = useShopData();
+  const [product, setProduct] = useState<PublicShopProduct | null>(null);
+  const [status, setStatus] = useState<"loading" | "ok" | "notfound">("loading");
+
+  // Client fetch → /api/shop/products/[id] is visible in the Network tab.
+  useEffect(() => {
+    let alive = true;
+    setStatus("loading");
+    fetchProduct(id)
+      .then((p) => {
+        if (!alive) return;
+        if (p) {
+          setProduct(p);
+          setStatus("ok");
+        } else {
+          setStatus("notfound");
+        }
+      })
+      .catch(() => {
+        if (alive) setStatus("notfound");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  if (status === "loading" || bundleLoading) return <PageLoading />;
+  if (status === "notfound" || !product) return <PageError message="Produkt nicht gefunden" />;
+  if (bundleError || !bundle) return <PageError />;
+
+  return (
+    <ProductDetail
+      product={product}
+      settings={bundle.settings}
+      promotions={bundle.promotions}
+      categories={bundle.categories}
+      related={bundle.products.filter((p) => p.id !== product.id)}
+    />
+  );
+}
+
+function ProductDetail({
   product,
   settings,
   promotions,
@@ -149,42 +194,39 @@ export function ProductView({
     <>
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
         {/* Breadcrumb */}
-        <nav className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-brand-gray mb-8">
-          <Link href="/" className="hover:text-brand-ink">
+        <nav className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-brand-gray mb-8 overflow-x-auto no-scrollbar whitespace-nowrap">
+          <Link href="/" className="hover:text-brand-ink shrink-0">
             {t.home}
           </Link>
           {category && (
             <>
-              <ChevronRight width={11} />
-              <Link href={`/?cat=${category.id}`} className="hover:text-brand-ink">
+              <ChevronRight width={11} className="shrink-0" />
+              <Link href={`/shop?cat=${category.id}`} className="hover:text-brand-ink shrink-0">
                 {tx(category.name)}
               </Link>
             </>
           )}
-          <ChevronRight width={11} />
-          <span className="text-brand-ink">{tx(product.displayName)}</span>
+          <ChevronRight width={11} className="shrink-0" />
+          <span className="text-brand-ink shrink-0">{tx(product.displayName)}</span>
         </nav>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
           {/* Gallery */}
-          <div className="lg:col-span-7 flex flex-col gap-4">
-            <div className="relative w-full aspect-[4/5] bg-brand-tile overflow-hidden rounded-sm">
+          <div className="lg:col-span-7 flex flex-col gap-4 lg:sticky lg:top-24 h-fit">
+            <div className="relative w-full aspect-[4/5] bg-card border border-border overflow-hidden rounded-lg">
               <ProductImage
                 src={mainImg}
                 alt={tx(product.displayName)}
                 seed={product.id}
                 priority
+                fit="contain"
                 sizes="(max-width: 1024px) 100vw, 55vw"
               />
-              {discountPct > 0 ? (
-                <span className="absolute top-4 left-4 bg-card/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-medium tracking-wide text-brand-green">
-                  −{discountPct}%
-                </span>
-              ) : availability === "LIMITED" ? (
+              {availability === "LIMITED" && (
                 <span className="absolute top-4 left-4 bg-card/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-medium tracking-wide text-brand-gold">
                   {t.limited}
                 </span>
-              ) : null}
+              )}
             </div>
 
             {images.length > 1 && (
@@ -194,12 +236,12 @@ export function ProductView({
                     key={i}
                     onClick={() => setMainIdx(i)}
                     className={cn(
-                      "relative aspect-square bg-brand-tile rounded-sm overflow-hidden border transition-all",
-                      i === mainIdx ? "border-brand-ink" : "border-transparent hover:border-brand-gray/50"
+                      "relative aspect-square bg-card rounded-md overflow-hidden border-2 transition-all",
+                      i === mainIdx ? "border-brand-ink" : "border-border hover:border-brand-gray/50"
                     )}
                     aria-label={`${tx(product.displayName)} ${i + 1}`}
                   >
-                    <ProductImage src={src} alt="" seed={`${product.id}-${i}`} sizes="10vw" />
+                    <ProductImage src={src} alt="" seed={`${product.id}-${i}`} fit="contain" sizes="10vw" />
                   </button>
                 ))}
               </div>
@@ -210,23 +252,17 @@ export function ProductView({
           <div className="lg:col-span-5 flex flex-col">
             <div className="border-b border-brand-ink/10 pb-6 mb-6">
               {category && <p className="eyebrow text-brand-green mb-3">{tx(category.name)}</p>}
-              <h1 className="font-serif text-3xl lg:text-4xl tracking-tight text-brand-ink font-light mb-3 leading-[1.05]">
+              <h1 className="font-serif text-2xl sm:text-3xl lg:text-5xl tracking-tight text-brand-ink font-normal mb-3 sm:mb-4 leading-tight">
                 {tx(product.displayName)}
               </h1>
-              <PriceTag
-                size="lg"
-                price={unitNet}
-                compareAt={discountPct > 0 ? unit : null}
-                discountPct={discountPct}
-                currency={currency}
-              />
+              <PriceTag size="lg" price={unitNet} currency={currency} />
               {taxRate > 0 && (
                 <p className="text-[11px] text-brand-gray mt-1">
                   {pricesIncludeTax ? fill(t.taxIncl, { rate: taxRate }) : fill(t.taxExcl, { rate: taxRate })}
                 </p>
               )}
               {tx(product.description) && (
-                <p className="mt-4 text-sm font-light text-brand-gray leading-relaxed whitespace-pre-line line-clamp-4">
+                <p className="mt-4 text-sm sm:text-base font-normal text-brand-gray leading-relaxed whitespace-pre-line line-clamp-4">
                   {tx(product.description)}
                 </p>
               )}
@@ -245,7 +281,7 @@ export function ProductView({
                         key={v.id}
                         onClick={() => setVariationId(v.id)}
                         className={cn(
-                          "px-4 py-2.5 border rounded-md text-xs transition-all",
+                          "px-5 py-3 border rounded-md text-sm transition-all",
                           selected
                             ? "border-brand-ink bg-brand-ink/[0.04]"
                             : "border-brand-ink/20 hover:border-brand-ink/60"
@@ -286,7 +322,7 @@ export function ProductView({
                               : toggleMulti(group.id, choice.id)
                           }
                           className={cn(
-                            "px-3.5 py-2.5 border rounded-md text-xs transition-all inline-flex items-center gap-2",
+                            "px-4 py-3 border rounded-md text-sm transition-all inline-flex items-center gap-2",
                             selected
                               ? "border-brand-ink bg-brand-ink/[0.04]"
                               : "border-brand-ink/20 hover:border-brand-ink/60"
@@ -311,11 +347,11 @@ export function ProductView({
 
             {/* Quantity + add to cart */}
             <div className="flex gap-3 mb-5">
-              <QuantityStepper value={qty} onChange={setQty} />
+              <QuantityStepper value={qty} onChange={setQty} className="h-14 w-32" />
               <button
                 onClick={addToCart}
                 disabled={unavailable}
-                className="flex-1 bg-brand-ink text-white hover:bg-brand-ink/90 transition-all rounded-md h-11 text-xs tracking-widest uppercase font-medium flex items-center justify-center gap-2.5 disabled:opacity-40"
+                className="flex-1 bg-brand-ink text-white hover:bg-brand-green transition-all rounded-md h-14 text-sm tracking-widest uppercase font-medium flex items-center justify-center gap-2.5 disabled:opacity-40"
               >
                 <span>{unavailable ? t.soldOut : t.addToCart}</span>
                 {!unavailable && (
@@ -327,9 +363,9 @@ export function ProductView({
               </button>
               <button
                 aria-label="Wishlist"
-                className="w-11 flex items-center justify-center border border-brand-ink/20 rounded-md hover:border-brand-ink transition-colors"
+                className="w-14 h-14 shrink-0 flex items-center justify-center border border-brand-ink/20 rounded-md hover:border-brand-ink transition-colors"
               >
-                <Heart width={17} />
+                <Heart width={19} />
               </button>
             </div>
 
@@ -349,20 +385,20 @@ export function ProductView({
             {/* Accordions */}
             <Accordion multiple={false} defaultValue={["desc"]} className="border-t border-brand-ink/10">
               <AccordionItem value="desc" className="border-b border-brand-ink/10">
-                <AccordionTrigger className="text-xs font-medium uppercase tracking-wide hover:no-underline py-4">
+                <AccordionTrigger className="text-sm font-medium uppercase tracking-wide hover:no-underline py-5">
                   {t.description}
                 </AccordionTrigger>
-                <AccordionContent className="text-sm font-light text-brand-gray leading-relaxed whitespace-pre-line pb-4">
+                <AccordionContent className="text-sm font-normal text-brand-gray leading-relaxed whitespace-pre-line pb-4">
                   {tx(product.description) || "—"}
                 </AccordionContent>
               </AccordionItem>
 
               {(tx(product.additionalInfo) || tx(product.disclaimer)) && (
                 <AccordionItem value="info" className="border-b border-brand-ink/10">
-                  <AccordionTrigger className="text-xs font-medium uppercase tracking-wide hover:no-underline py-4">
+                  <AccordionTrigger className="text-sm font-medium uppercase tracking-wide hover:no-underline py-5">
                     {t.info}
                   </AccordionTrigger>
-                  <AccordionContent className="text-sm font-light text-brand-gray leading-relaxed whitespace-pre-line pb-4 space-y-2">
+                  <AccordionContent className="text-sm font-normal text-brand-gray leading-relaxed whitespace-pre-line pb-4 space-y-2">
                     {tx(product.additionalInfo) && <p>{tx(product.additionalInfo)}</p>}
                     {tx(product.disclaimer) && <p className="text-brand-gray/80">{tx(product.disclaimer)}</p>}
                   </AccordionContent>
@@ -370,10 +406,10 @@ export function ProductView({
               )}
 
               <AccordionItem value="ship" className="border-b border-brand-ink/10">
-                <AccordionTrigger className="text-xs font-medium uppercase tracking-wide hover:no-underline py-4">
+                <AccordionTrigger className="text-sm font-medium uppercase tracking-wide hover:no-underline py-5">
                   {t.deliveryTerms}
                 </AccordionTrigger>
-                <AccordionContent className="text-sm font-light text-brand-gray leading-relaxed pb-4 space-y-2">
+                <AccordionContent className="text-sm font-normal text-brand-gray leading-relaxed pb-4 space-y-2">
                   {product.fulfillmentModes && product.fulfillmentModes.length > 0 && (
                     <p className="flex flex-wrap gap-2">
                       {product.fulfillmentModes.map((m) => (
@@ -395,15 +431,15 @@ export function ProductView({
             </Accordion>
 
             {/* Trust badges (truthful for a local cooperative) */}
-            <div className="grid grid-cols-3 gap-2 mt-8 pt-2">
+            <div className="grid grid-cols-3 gap-3 mt-10 pt-4">
               {[
                 { icon: Leaf, label: locale === "en" ? "Local & regional" : "Lokal & regional" },
                 { icon: Store, label: locale === "en" ? "Cooperative" : "Genossenschaft" },
                 { icon: ShieldCheck, label: locale === "en" ? "Secure payment" : "Sichere Zahlung" },
               ].map(({ icon: Icon, label }) => (
-                <div key={label} className="flex flex-col items-center justify-center text-center gap-2">
-                  <Icon width={18} className="text-brand-ink/60" strokeWidth={1.5} />
-                  <span className="text-[10px] uppercase tracking-wide text-brand-gray">{label}</span>
+                <div key={label} className="flex flex-col items-center justify-center text-center gap-2.5">
+                  <Icon width={24} className="text-brand-green" strokeWidth={1.4} />
+                  <span className="text-xs uppercase tracking-wide text-brand-gray">{label}</span>
                 </div>
               ))}
             </div>
@@ -416,7 +452,7 @@ export function ProductView({
         <section className="border-t border-brand-ink/5 bg-card py-16">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-end justify-between mb-10">
-              <h2 className="font-serif text-2xl lg:text-3xl tracking-tight text-brand-ink font-light">
+              <h2 className="font-serif text-2xl lg:text-3xl tracking-tight text-brand-ink font-normal">
                 {t.recommended}
               </h2>
               <Link

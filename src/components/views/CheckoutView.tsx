@@ -16,12 +16,22 @@ import { getTenant } from "@/lib/theme";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SummaryLines } from "@/components/SummaryLines";
+import { PaymentBadge } from "@/components/PaymentBadge";
+import { useShopData } from "@/context/ShopDataContext";
+import { PageLoading, PageError } from "@/components/PageState";
 import { cn } from "@/lib/utils";
 import type { FulfillmentMode, PublicShopBundle } from "@/lib/types";
 
 const tenant = getTenant(process.env.NEXT_PUBLIC_TENANT);
 
-export function CheckoutView({ bundle }: { bundle: PublicShopBundle }) {
+export function CheckoutView() {
+  const { bundle, loading, error } = useShopData();
+  if (loading) return <PageLoading />;
+  if (error || !bundle) return <PageError />;
+  return <CheckoutForm bundle={bundle} />;
+}
+
+function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
   const { products, settings, promotions, paymentProviders } = bundle;
   const { t, tx } = useLocale();
   const { clear, ready } = useCart();
@@ -107,7 +117,7 @@ export function CheckoutView({ bundle }: { bundle: PublicShopBundle }) {
 
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
-      <h1 className="font-serif text-3xl lg:text-4xl tracking-tight text-brand-ink font-light mb-10">{t.checkout}</h1>
+      <h1 className="font-serif text-3xl lg:text-4xl tracking-tight text-brand-ink font-normal mb-10">{t.checkout}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 lg:gap-16">
         {/* Form */}
@@ -162,7 +172,7 @@ export function CheckoutView({ bundle }: { bundle: PublicShopBundle }) {
             )}
 
             {fulfillment === "PICKUP" && (
-              <p className="mt-4 text-xs font-light text-brand-gray leading-relaxed">{t.pickupInfo}</p>
+              <p className="mt-4 text-xs font-normal text-brand-gray leading-relaxed">{t.pickupInfo}</p>
             )}
           </div>
 
@@ -175,7 +185,7 @@ export function CheckoutView({ bundle }: { bundle: PublicShopBundle }) {
                   key={p.id}
                   onClick={() => setPaymentId(p.id)}
                   className={cn(
-                    "w-full flex items-center gap-3 border rounded-md px-4 py-3.5 text-sm transition-all text-left",
+                    "w-full flex items-center gap-3 border rounded-md h-12 px-4 text-sm transition-all text-left",
                     paymentId === p.id ? "border-brand-ink bg-brand-ink/[0.03]" : "border-brand-ink/20 hover:border-brand-ink/50"
                   )}
                 >
@@ -187,7 +197,8 @@ export function CheckoutView({ bundle }: { bundle: PublicShopBundle }) {
                   >
                     {paymentId === p.id && <span className="w-1.5 h-1.5 bg-white rounded-full" />}
                   </span>
-                  {p.name}
+                  <PaymentBadge provider={p.provider} />
+                  <span className="flex-1">{p.name}</span>
                 </button>
               ))}
             </div>
@@ -274,7 +285,7 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <Label htmlFor={id} className="text-[11px] text-brand-gray mb-1.5 block">
+      <Label htmlFor={id} className="text-xs text-brand-gray mb-2 block">
         {label}
         {required && <span className="text-brand-gold"> *</span>}
       </Label>
@@ -283,7 +294,7 @@ function Field({
         type={type}
         value={value}
         onChange={onChange}
-        className="rounded-md border-brand-ink/20 focus-visible:border-brand-ink focus-visible:ring-0 bg-transparent"
+        className="h-12 text-sm rounded-md border-brand-ink/20 focus-visible:border-brand-ink focus-visible:ring-0 bg-transparent"
       />
     </div>
   );
@@ -302,7 +313,7 @@ function SelectCard({
     <button
       onClick={onClick}
       className={cn(
-        "border rounded-md px-4 py-3 text-xs transition-all text-center",
+        "border rounded-md h-12 px-4 text-sm transition-all flex items-center justify-center text-center",
         selected ? "border-brand-ink bg-brand-ink/[0.03]" : "border-brand-ink/20 hover:border-brand-ink/50"
       )}
     >

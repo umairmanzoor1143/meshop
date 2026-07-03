@@ -53,19 +53,21 @@ export function ProductCard({
 
   return (
     <div className="group">
-      <div className="relative aspect-[3/4] bg-brand-tile rounded-sm overflow-hidden mb-3">
+      <div className="relative aspect-[4/5] bg-card border border-border rounded-md overflow-hidden mb-4">
         <Link href={href} aria-label={name}>
           <ProductImage
             src={img}
             alt={name}
             seed={product.id}
             priority={priority}
-            className="transition-transform duration-500 group-hover:scale-105"
+            fit="contain"
+            sizes="(max-width: 768px) 50vw, 25vw"
+            className="transition-transform duration-500 group-hover:scale-[1.04]"
           />
         </Link>
 
         {price.discountPct > 0 && (
-          <span className="absolute top-3 left-3 bg-card/90 backdrop-blur px-2.5 py-1 rounded-full text-[10px] font-medium tracking-wide text-brand-green">
+          <span className="absolute top-2.5 left-2.5 bg-brand-ink text-white px-2.5 py-0.5 rounded-full text-[10px] font-medium tracking-wide">
             −{price.discountPct}%
           </span>
         )}
@@ -75,30 +77,35 @@ export function ProductCard({
             type="button"
             onClick={quickAdd}
             aria-label={t.addToCart}
-            className="absolute bottom-3 right-3 w-9 h-9 bg-card/90 backdrop-blur rounded-full flex items-center justify-center text-brand-ink shadow-sm opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-brand-ink hover:text-white"
+            className="absolute bottom-3.5 right-3.5 w-11 h-11 bg-card border border-border rounded-full flex items-center justify-center text-brand-ink shadow-sm opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 hover:bg-brand-ink hover:text-white hover:border-brand-ink"
           >
-            <Plus width={16} />
+            <Plus width={18} />
           </button>
         )}
       </div>
 
-      {eyebrow && <p className="eyebrow text-brand-gray mb-1">{eyebrow}</p>}
+      {eyebrow && <p className="eyebrow text-brand-gray mb-1.5">{eyebrow}</p>}
 
       <Link href={href}>
-        <h3 className="font-serif text-[15px] leading-snug text-brand-ink tracking-tight hover:text-brand-green transition-colors">
+        <h3 className="font-serif text-lg sm:text-xl leading-snug text-brand-ink tracking-tight hover:text-brand-green transition-colors">
           {name}
         </h3>
       </Link>
 
-      <div className="mt-1.5 flex items-center justify-between gap-2">
+      <div className="mt-2">
         <PriceTag
-          size="sm"
+          stack
+          size="lg"
           price={price.price}
           compareAt={price.compareAt}
-          discountPct={price.discountPct}
+          discountPct={0}
           currency={currency}
         />
-        {availability !== "UNLIMITED" && <AvailabilityBadge status={availability} />}
+        {availability !== "UNLIMITED" && (
+          <div className="mt-2.5">
+            <AvailabilityBadge status={availability} />
+          </div>
+        )}
       </div>
     </div>
   );

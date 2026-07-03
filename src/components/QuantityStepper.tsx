@@ -34,7 +34,7 @@ export function QuantityStepper({
       >
         <Minus width={14} />
       </button>
-      <span className="text-sm font-light tabular-nums">{value}</span>
+      <span className="text-sm font-normal tabular-nums">{value}</span>
       <button
         type="button"
         onClick={inc}

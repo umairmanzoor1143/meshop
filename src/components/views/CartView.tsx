@@ -12,7 +12,9 @@ import { formatMoney } from "@/lib/format";
 import { ProductImage } from "@/components/ProductImage";
 import { QuantityStepper } from "@/components/QuantityStepper";
 import { SummaryLines } from "@/components/SummaryLines";
-import type { FulfillmentMode, PublicShopBundle } from "@/lib/types";
+import { useShopData } from "@/context/ShopDataContext";
+import { PageLoading, PageError } from "@/components/PageState";
+import type { FulfillmentMode } from "@/lib/types";
 
 // Cart preview uses a no-shipping fulfillment mode; delivery cost is chosen at checkout.
 function previewMode(methods: FulfillmentMode[] | undefined): FulfillmentMode {
@@ -20,12 +22,18 @@ function previewMode(methods: FulfillmentMode[] | undefined): FulfillmentMode {
   return m.includes("PICKUP") ? "PICKUP" : m.includes("RESERVATION") ? "RESERVATION" : m[0] ?? "PICKUP";
 }
 
-export function CartView({ bundle }: { bundle: PublicShopBundle }) {
-  const { products, settings, promotions } = bundle;
+export function CartView() {
+  const { bundle, loading, error } = useShopData();
+  const products = bundle?.products ?? [];
+  const promotions = bundle?.promotions ?? [];
+  const settings = bundle?.settings;
   const { t, tx } = useLocale();
   const { setQty, remove } = useCart();
   const lines = useCartLines(products);
-  const currency = settings.pricingTaxSettings.currencies[0] ?? "CHF";
+  const currency = settings?.pricingTaxSettings.currencies[0] ?? "CHF";
+
+  if (loading) return <PageLoading />;
+  if (error || !bundle || !settings) return <PageError />;
 
   if (lines.length === 0) {
     return (
@@ -47,7 +55,7 @@ export function CartView({ bundle }: { bundle: PublicShopBundle }) {
 
   return (
     <section className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
-      <h1 className="font-serif text-3xl lg:text-4xl tracking-tight text-brand-ink font-light mb-10">
+      <h1 className="font-serif text-3xl lg:text-4xl tracking-tight text-brand-ink font-normal mb-10">
         {t.cartTitle}
       </h1>
 
@@ -99,7 +107,7 @@ export function CartView({ bundle }: { bundle: PublicShopBundle }) {
                             {formatMoney(line.lineTotal, currency)}
                           </span>
                         )}
-                        <span className="text-sm font-light text-brand-ink">
+                        <span className="text-sm font-normal text-brand-ink">
                           {formatMoney(line.lineTotal - line.discount, currency)}
                         </span>
                       </div>
