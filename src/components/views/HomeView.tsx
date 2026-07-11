@@ -1,14 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { MoveRight, MountainSnow, ArrowRight } from "lucide-react";
+import { MoveRight, ArrowRight } from "lucide-react";
 import { useLocale } from "@/context/LocaleContext";
 import { useShopData } from "@/context/ShopDataContext";
 import { ProductCard } from "@/components/ProductCard";
 import { PageLoading, PageError } from "@/components/PageState";
-import { getTenant } from "@/lib/theme";
-
-const tenant = getTenant(process.env.NEXT_PUBLIC_TENANT);
+import { companyName, companyAboutIntro } from "@/lib/company";
+import { activeShopWidePromotion, promotionShortLabel } from "@/lib/pricing";
 
 export function HomeView() {
   const { t, tx } = useLocale();
@@ -24,24 +23,29 @@ export function HomeView() {
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .slice(0, 4);
 
+  // Hero content is real data only: company name/about + live promotion + counts.
+  const name = companyName(bundle.company);
+  const about = companyAboutIntro(bundle.about);
+  const shopWidePromo = activeShopWidePromotion(promotions);
+
   return (
     <div>
       {/* ================= HERO ================= */}
-      <section className="relative overflow-hidden bg-brand-cream border-b border-border">
+      {/* <section className="relative overflow-hidden bg-brand-cream border-b border-border">
         <RigiSilhouette />
 
         <div className="relative max-w-5xl mx-auto px-6 flex flex-col items-center text-center py-12 sm:py-16 lg:py-27">
-          <p className="eyebrow text-brand-green mb-6 flex items-center gap-2">
-            <MountainSnow width={16} /> {t.heroKicker}
-          </p>
+          {name && (
+            <h1 className="font-serif font-normal text-brand-ink tracking-tight leading-[1.0] text-4xl sm:text-6xl lg:text-7xl max-w-4xl">
+              {name}
+            </h1>
+          )}
 
-          <h1 className="font-serif font-normal text-brand-ink tracking-tight leading-[1.0] text-4xl sm:text-6xl lg:text-7xl max-w-4xl">
-            {t.heroTitle}
-          </h1>
-
-          <p className="mt-6 text-base sm:text-lg lg:text-xl text-brand-gray leading-relaxed max-w-xl">
-            {t.heroSub}
-          </p>
+          {about && (
+            <p className="mt-6 text-base sm:text-lg lg:text-xl text-brand-gray leading-relaxed max-w-xl">
+              {about}
+            </p>
+          )}
 
           <div className="mt-8 flex flex-col sm:flex-row items-center gap-4">
             <Link
@@ -51,36 +55,34 @@ export function HomeView() {
               {t.shopNow}
               <MoveRight width={17} />
             </Link>
-            <Link
-              href="/shop?promo=1"
-              className="inline-flex items-center gap-2 text-sm tracking-wide text-brand-ink border-b border-brand-ink/30 pb-0.5 hover:border-brand-ink transition-colors"
-            >
-              {t.promoTag} · −10%
-            </Link>
+            {shopWidePromo && (
+              <Link
+                href="/shop?promo=1"
+                className="inline-flex items-center gap-2 text-sm tracking-wide text-brand-ink border-b border-brand-ink/30 pb-0.5 hover:border-brand-ink transition-colors"
+              >
+                {t.promoTag} · {promotionShortLabel(shopWidePromo, currency)}
+              </Link>
+            )}
           </div>
 
-          <div className="mt-10 flex items-center gap-8 sm:gap-12 text-center">
+          {/* Counts are derived from the live catalog — no invented figures. */}
+          {/* <div className="mt-10 flex items-center gap-8 sm:gap-12 text-center">
             {[
-              ["90+", t.heroLocal],
-              ["1997", tenant.short],
               [`${products.length}`, t.results],
+              [`${categories.length}`, t.categories],
             ].map(([big, small], i) => (
               <div key={i} className="flex flex-col items-center">
-                <span className="font-serif text-3xl lg:text-4xl text-brand-ink">
-                  {big}
-                </span>
-                <span className="text-xs uppercase tracking-wider text-brand-gray mt-1">
-                  {small}
-                </span>
+                <span className="font-serif text-3xl lg:text-4xl text-brand-ink">{big}</span>
+                <span className="text-xs uppercase tracking-wider text-brand-gray mt-1">{small}</span>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
+          </div> */}
+        {/* </div> */}
+      {/* </section> */} 
 
       {/* ================= FEATURED ================= */}
       {featured.length > 0 && (
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24">
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-12">
           <div className="flex items-end justify-between mb-10 lg:mb-12">
             <div>
               <p className="eyebrow text-brand-green mb-2">{t.featured}</p>

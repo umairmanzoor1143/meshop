@@ -153,6 +153,34 @@ export function promotionDiscount(promo: PublicShopPromotion, amount: number): n
   return Math.min(amount, promo.discountValue); // FIXED_AMOUNT
 }
 
+/** Is this promotion currently within its active window? */
+export function promotionActiveNow(promo: PublicShopPromotion, now = new Date()): boolean {
+  if (!promo.isActive) return false;
+  if (promo.startDate && now.getTime() < new Date(promo.startDate).getTime()) return false;
+  if (promo.endDate && now.getTime() > new Date(promo.endDate).getTime()) return false;
+  return true;
+}
+
+/** The largest currently-active shop-wide promotion, or null. Real data only. */
+export function activeShopWidePromotion(
+  promotions: PublicShopPromotion[],
+  now = new Date()
+): PublicShopPromotion | null {
+  let best: PublicShopPromotion | null = null;
+  for (const promo of promotions) {
+    if (promo.scope !== "SHOP_WIDE" || !promotionActiveNow(promo, now)) continue;
+    if (!best || promo.discountValue > best.discountValue) best = promo;
+  }
+  return best;
+}
+
+/** Short discount label from real promotion values, e.g. "−10%" or "−CHF 5". */
+export function promotionShortLabel(promo: PublicShopPromotion, currency = "CHF"): string {
+  return promo.discountType === "PERCENTAGE"
+    ? `−${promo.discountValue}%`
+    : `−${currency} ${promo.discountValue}`;
+}
+
 /** Best (largest) applicable promotion for a line, or null. */
 export function bestPromotion(
   product: PublicShopProduct,

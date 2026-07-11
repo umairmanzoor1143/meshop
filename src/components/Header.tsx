@@ -7,14 +7,13 @@ import { Menu, Search, ShoppingBag, ChevronDown } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useLocale } from "@/context/LocaleContext";
 import { buildCategoryTree, type CategoryNode } from "@/lib/categories";
-import { getTenant } from "@/lib/theme";
+import { companyName, companyMark, companyLogoUrl } from "@/lib/company";
+import { activeShopWidePromotion, promotionShortLabel } from "@/lib/pricing";
 import { LanguageSelect } from "@/components/LanguageSelect";
 import { useShopData } from "@/context/ShopDataContext";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import type { PublicShopCategory, Language, PublicShopBundle } from "@/lib/types";
 import { cn } from "@/lib/utils";
-
-const tenant = getTenant(process.env.NEXT_PUBLIC_TENANT);
 
 function anyPromotionActive(bundle: PublicShopBundle | null): boolean {
   if (!bundle) return false;
@@ -40,6 +39,16 @@ export function Header() {
   const promoActive = anyPromotionActive(bundle);
   const tree = buildCategoryTree(categories);
 
+  // Real company identity (null when the company webservice is unavailable).
+  const company = bundle?.company ?? null;
+  const name = companyName(company);
+  const mark = companyMark(company);
+  const logoUrl = companyLogoUrl(company);
+
+  // Announcement bar shows only a real, currently-active shop-wide promotion.
+  const currency = bundle?.settings.pricingTaxSettings.currencies[0] ?? "CHF";
+  const shopWidePromo = activeShopWidePromotion(bundle?.promotions ?? []);
+
   function submitSearch(e: React.FormEvent) {
     e.preventDefault();
     router.push(q.trim() ? `/shop?q=${encodeURIComponent(q.trim())}` : "/shop");
@@ -47,16 +56,26 @@ export function Header() {
   }
 
   const Logo = (
-    <Link href="/" className="flex items-center gap-3" aria-label={tenant.name}>
-      <span className="w-11 h-11 shrink-0 rounded-md bg-brand-ink text-brand-cream font-serif text-lg font-medium flex items-center justify-center tracking-tight">
-        {tenant.mark}
-      </span>
-      <span className="leading-none">
-        <span className="block font-serif text-xl lg:text-2xl font-medium tracking-tight text-brand-ink">
-          {tenant.name}
+    <Link href="/" className="flex items-center gap-3" aria-label={name ?? t.shop}>
+      {logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={logoUrl}
+          alt={name ?? ""}
+          className="w-11 h-11 shrink-0 rounded-md object-cover"
+        />
+      ) : mark ? (
+        <span className="w-11 h-11 shrink-0 rounded-md bg-brand-ink text-brand-cream font-serif text-lg font-medium flex items-center justify-center tracking-tight">
+          {mark}
         </span>
-        <span className="hidden sm:block eyebrow text-brand-green mt-1">{tenant.tagline}</span>
-      </span>
+      ) : null}
+      {name && (
+        <span className="leading-none">
+          <span className="block font-serif text-xl lg:text-2xl font-medium tracking-tight text-brand-ink">
+            {name}
+          </span>
+        </span>
+      )}
     </Link>
   );
 
@@ -78,15 +97,16 @@ export function Header() {
   return (
     <>
       <header>
-      {/* Announcement bar (scrolls away) */}
-      <div className="bg-brand-ink text-white text-[11px] sm:text-xs py-2.5 px-4 text-center tracking-wide font-normal whitespace-nowrap overflow-hidden">
-        <span className="opacity-90">
-          {tenant.tagline}
-          <span className="hidden sm:inline"> · {tenant.contact.city}</span>
-          <span className="mx-1.5 text-brand-gold">·</span>
-          <span className="text-brand-gold">Abholung &amp; Lieferung</span>
-        </span>
-      </div>
+      {/* Announcement bar — only shown when a real shop-wide promotion is active. */}
+      {shopWidePromo && (
+        <div className="bg-brand-ink text-white text-[11px] sm:text-xs py-2.5 px-4 text-center tracking-wide font-normal whitespace-nowrap overflow-hidden">
+          <span className="opacity-90">
+            {t.promoTag}
+            <span className="mx-1.5 text-brand-gold">·</span>
+            <span className="text-brand-gold">{promotionShortLabel(shopWidePromo, currency)}</span>
+          </span>
+        </div>
+      )}
 
       {/* Main row: logo LEFT, search + language + cart RIGHT (sticky on mobile only) */}
       <div className="sticky top-0 z-40 lg:static bg-brand-cream border-b border-border">
@@ -98,8 +118,8 @@ export function Header() {
                 <Menu width={24} strokeWidth={1.5} />
               </SheetTrigger>
               <SheetContent side="left" className="w-[88%] max-w-sm bg-brand-cream p-0">
-                <SheetTitle className="sr-only">{tenant.name}</SheetTitle>
-                <MobileMenu tree={tree} languages={languages} onNavigate={() => setMobileOpen(false)} />
+                <SheetTitle className="sr-only">{name ?? t.shop}</SheetTitle>
+                <MobileMenu tree={tree} languages={languages} name={name} onNavigate={() => setMobileOpen(false)} />
               </SheetContent>
             </Sheet>
             {Logo}
@@ -189,10 +209,12 @@ function NavItem({ node, tx }: { node: CategoryNode; tx: (t: PublicShopCategory[
 function MobileMenu({
   tree,
   languages,
+  name,
   onNavigate,
 }: {
   tree: CategoryNode[];
   languages: Language[];
+  name: string | null;
   onNavigate: () => void;
 }) {
   const { t, tx } = useLocale();
@@ -208,9 +230,11 @@ function MobileMenu({
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center px-6 h-20 border-b border-border">
-        <span className="font-serif text-xl font-medium tracking-tight">{tenant.name}</span>
-      </div>
+      {name && (
+        <div className="flex items-center px-6 h-20 border-b border-border">
+          <span className="font-serif text-xl font-medium tracking-tight">{name}</span>
+        </div>
+      )}
       <form onSubmit={submit} className="flex items-center gap-2.5 px-6 py-4 border-b border-border">
         <Search width={18} className="text-brand-gray" />
         <input

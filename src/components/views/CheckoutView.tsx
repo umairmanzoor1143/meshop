@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Lock, ArrowRight } from "lucide-react";
+import { Check, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useCartLines } from "@/context/useCartLines";
@@ -12,7 +12,7 @@ import { computeCart, type DeliveryTier } from "@/lib/pricing";
 import { describeLineConfig } from "@/lib/lineLabel";
 import { createOrderRef, submitOrder } from "@/lib/order";
 import { formatMoney } from "@/lib/format";
-import { getTenant } from "@/lib/theme";
+import { companyPickupInfo } from "@/lib/company";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SummaryLines } from "@/components/SummaryLines";
@@ -21,8 +21,6 @@ import { useShopData } from "@/context/ShopDataContext";
 import { PageLoading, PageError } from "@/components/PageState";
 import { cn } from "@/lib/utils";
 import type { FulfillmentMode, PublicShopBundle } from "@/lib/types";
-
-const tenant = getTenant(process.env.NEXT_PUBLIC_TENANT);
 
 export function CheckoutView() {
   const { bundle, loading, error } = useShopData();
@@ -171,8 +169,11 @@ function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
               </div>
             )}
 
-            {fulfillment === "PICKUP" && (
-              <p className="mt-4 text-xs font-normal text-brand-gray leading-relaxed">{t.pickupInfo}</p>
+            {fulfillment === "PICKUP" && (companyPickupInfo(bundle.company) || t.pickup) && (
+              <p className="mt-4 text-xs font-normal text-brand-gray leading-relaxed">
+                {t.pickupLabel}
+                {companyPickupInfo(bundle.company) ? ` · ${companyPickupInfo(bundle.company)}` : ""}
+              </p>
             )}
           </div>
 
@@ -256,9 +257,6 @@ function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
               {t.placeOrder}
               <ArrowRight width={15} />
             </button>
-            <p className="flex items-center justify-center gap-1.5 mt-3 text-[11px] text-brand-gray">
-              <Lock width={11} /> {t.securePay}
-            </p>
           </div>
         </aside>
       </div>

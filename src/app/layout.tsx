@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
-import { Header } from "@/components/Header";
-import { Footer } from "@/components/Footer";
-import { getTenant } from "@/lib/theme";
+import { AppShell } from "@/components/AppShell";
+import { loadCompany, loadCompanyAbout } from "@/lib/connect";
+import { companyName, companyAboutIntro } from "@/lib/company";
 
 const cormorant = Cormorant_Garamond({
   variable: "--font-cormorant",
@@ -22,13 +22,18 @@ const inter = Inter({
 
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
-const tenant = getTenant(process.env.NEXT_PUBLIC_TENANT);
-
-export const metadata: Metadata = {
-  title: `${tenant.name} — ${tenant.tagline}`,
-  description:
-    "Der Marktplatz für lokalen Genuss aus Küssnacht am Rigi und Umgebung. Marktstände, regionale Produkte und Anlässe — direkt und fair.",
-};
+// Title/description come from the real company webservice; nothing is fabricated.
+// When the company endpoint is unavailable, we fall back to a neutral generic
+// title rather than inventing a shop name.
+export async function generateMetadata(): Promise<Metadata> {
+  const [company, about] = await Promise.all([loadCompany(), loadCompanyAbout()]);
+  const name = companyName(company);
+  const intro = companyAboutIntro(about);
+  return {
+    title: name ?? "Shop",
+    description: intro ?? undefined,
+  };
+}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // Data is fetched on the CLIENT (see ShopDataProvider) so all /api/shop/*
@@ -41,12 +46,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-screen flex flex-col bg-background text-foreground">
         <Providers>
-          <Header />
-          {/* Block (not flex) so page <section>s fill their max-width and never
-              shrink to content — otherwise mx-auto flex items re-center when a
-              grid is empty, shifting the sidebar. flex-grow still pushes the footer down. */}
-          <main className="flex-grow">{children}</main>
-          <Footer />
+          <AppShell>{children}</AppShell>
         </Providers>
       </body>
     </html>

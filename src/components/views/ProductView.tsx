@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Heart, Leaf, Store, ShieldCheck, Check } from "lucide-react";
+import { ChevronRight, Heart, Check } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useLocale } from "@/context/LocaleContext";
@@ -16,7 +16,7 @@ import {
 } from "@/lib/pricing";
 import { imageUrl } from "@/lib/image";
 import { formatMoney, fill } from "@/lib/format";
-import { getTenant } from "@/lib/theme";
+import { companyPickupInfo } from "@/lib/company";
 import { PriceTag } from "@/components/PriceTag";
 import { ProductImage } from "@/components/ProductImage";
 import { ProductCard } from "@/components/ProductCard";
@@ -39,8 +39,6 @@ import type {
   PublicShopPromotion,
   PublicShopSettings,
 } from "@/lib/types";
-
-const tenant = getTenant(process.env.NEXT_PUBLIC_TENANT);
 
 const microcopy = {
   de: { availableUntil: "Verfügbar bis {date}", from: "ab", included: "inkl." },
@@ -111,7 +109,11 @@ function ProductDetail({
 }) {
   const { add } = useCart();
   const { t, tx, locale } = useLocale();
+  const { bundle } = useShopData();
   const mc = microcopy[locale === "en" ? "en" : "de"];
+
+  // Real pickup detail (address + hours) from the company webservice, or null.
+  const pickupInfo = companyPickupInfo(bundle?.company ?? null);
 
   const currency: Currency = settings?.pricingTaxSettings.currencies[0] ?? "CHF";
   const pricesIncludeTax = settings?.pricingTaxSettings.pricesIncludeTax ?? false;
@@ -425,24 +427,14 @@ function ProductDetail({
                       {t.delivery}: {mc.from} {formatMoney(settings.orderManagementSettings.deliveryPrices.standard, currency)}
                     </p>
                   )}
-                  <p>{t.pickupInfo}</p>
+                  {pickupInfo && (
+                    <p>
+                      {t.pickupLabel} · {pickupInfo}
+                    </p>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
-
-            {/* Trust badges (truthful for a local cooperative) */}
-            <div className="grid grid-cols-3 gap-3 mt-10 pt-4">
-              {[
-                { icon: Leaf, label: locale === "en" ? "Local & regional" : "Lokal & regional" },
-                { icon: Store, label: locale === "en" ? "Cooperative" : "Genossenschaft" },
-                { icon: ShieldCheck, label: locale === "en" ? "Secure payment" : "Sichere Zahlung" },
-              ].map(({ icon: Icon, label }) => (
-                <div key={label} className="flex flex-col items-center justify-center text-center gap-2.5">
-                  <Icon width={24} className="text-brand-green" strokeWidth={1.4} />
-                  <span className="text-xs uppercase tracking-wide text-brand-gray">{label}</span>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>

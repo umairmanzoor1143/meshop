@@ -192,7 +192,83 @@ export interface PublicShopPaymentProvider {
   updated: string;
 }
 
-/** Aggregate payload from GET /connect/shop. */
+// ---------------------------------------------------------------------------
+// Company identity — from the SEPARATE /connect/company webservices
+// (readCompany → CompanyPublicDto, readCompanyAbout → AboutDto). The shop DTOs
+// carry no name/tagline/address/contact, so all storefront identity comes from
+// here. Mirrors me/backend/src/modules/company/company.dto.ts + about/about.dto.ts.
+// ---------------------------------------------------------------------------
+
+export interface Weblink {
+  code: string;
+  url: string;
+}
+
+export interface Weblinks {
+  website: string;
+  vrTour: unknown | null;
+  weblinksItems: Weblink[];
+}
+
+export interface OpeningHourItem {
+  weekday: string;
+  from: string;
+  to: string;
+  message: string;
+}
+
+export interface OpeningHours {
+  message: string;
+  items: OpeningHourItem[];
+}
+
+export interface CompanyCoordinate {
+  lat?: number;
+  lng?: number;
+}
+
+export interface CompanyAddress {
+  street?: string;
+  streetNumber?: string;
+  zip?: string;
+  city?: string;
+  state?: string;
+  coordinate?: CompanyCoordinate | null;
+}
+
+/** GET /connect/company/:companyId → CompanyPublicDto. */
+export interface PublicCompany {
+  id: string;
+  company: string;
+  email: string;
+  phone: string;
+  weblinks: Weblinks | null;
+  openingHours: OpeningHours | null;
+  image: string;
+  profileState: unknown | null;
+  categories: string[];
+  address: CompanyAddress | null;
+  reviewPoints: number;
+  favoritesCount: number;
+}
+
+export interface CompanyAboutItem {
+  id: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  videoUrl: string;
+  tags: string[];
+}
+
+/** GET /connect/company/about/:companyId → AboutDto. */
+export interface CompanyAbout {
+  companyId: string;
+  description: string;
+  items: CompanyAboutItem[];
+}
+
+/** Aggregate payload from GET /connect/shop, plus company identity. */
 export interface PublicShopBundle {
   ownerId: string;
   shopId: string;
@@ -201,4 +277,8 @@ export interface PublicShopBundle {
   products: PublicShopProduct[];
   promotions: PublicShopPromotion[];
   paymentProviders: PublicShopPaymentProvider[];
+  /** Real company identity, or null when the company webservice is unavailable. */
+  company: PublicCompany | null;
+  /** Real company "about" copy, or null when unavailable. */
+  about: CompanyAbout | null;
 }

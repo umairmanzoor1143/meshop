@@ -7,6 +7,8 @@ import type {
   PublicShopCategory,
   PublicShopPromotion,
   PublicShopPaymentProvider,
+  PublicCompany,
+  CompanyAbout,
 } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -26,6 +28,9 @@ import type {
 const BASE = (process.env.CONNECT_API_BASE_URL ?? "http://localhost:5000").replace(/\/$/, "");
 const TOKEN = process.env.CONNECT_TOKEN ?? "";
 const SHOP_ID = process.env.CONNECT_SHOP_ID ?? "";
+// The company webservice keys on companyId. For a company-owned shop this is the
+// shop's ownerId; override with CONNECT_COMPANY_ID when they differ.
+const COMPANY_ID = process.env.CONNECT_COMPANY_ID ?? process.env.CONNECT_OWNER_ID ?? "";
 const REVALIDATE = 60; // seconds — ISR cache window for catalog data
 
 async function connectGet<T>(path: string): Promise<T> {
@@ -76,15 +81,44 @@ export async function loadPaymentProviders(shopId = SHOP_ID): Promise<PublicShop
   }
 }
 
+/**
+ * Real company identity from GET /connect/company/:companyId. Returns null (never
+ * fabricated defaults) when the endpoint is unavailable or no companyId is set —
+ * the storefront then simply omits the missing fields.
+ */
+export async function loadCompany(companyId = COMPANY_ID): Promise<PublicCompany | null> {
+  if (!companyId) return null;
+  try {
+    return await connectGet<PublicCompany>(`/connect/company/${companyId}`);
+  } catch (err) {
+    console.warn("[meshop] company endpoint unavailable:", err);
+    return null;
+  }
+}
+
+/** Real company "about" copy from GET /connect/company/about/:companyId. Null when unavailable. */
+export async function loadCompanyAbout(companyId = COMPANY_ID): Promise<CompanyAbout | null> {
+  if (!companyId) return null;
+  try {
+    return await connectGet<CompanyAbout>(`/connect/company/about/${companyId}`);
+  } catch (err) {
+    console.warn("[meshop] company about endpoint unavailable:", err);
+    return null;
+  }
+}
+
 /** Compose the full storefront bundle from the per-resource endpoints. */
 export async function loadBundle(shopId = SHOP_ID): Promise<PublicShopBundle> {
-  const [settings, categories, products, promotions, paymentProviders] = await Promise.all([
-    loadSettings(shopId),
-    loadCategories(shopId),
-    loadProducts(shopId),
-    loadPromotions(shopId),
-    loadPaymentProviders(shopId),
-  ]);
+  const [settings, categories, products, promotions, paymentProviders, company, about] =
+    await Promise.all([
+      loadSettings(shopId),
+      loadCategories(shopId),
+      loadProducts(shopId),
+      loadPromotions(shopId),
+      loadPaymentProviders(shopId),
+      loadCompany(),
+      loadCompanyAbout(),
+    ]);
   return {
     ownerId: process.env.CONNECT_OWNER_ID ?? "",
     shopId,
@@ -93,5 +127,7 @@ export async function loadBundle(shopId = SHOP_ID): Promise<PublicShopBundle> {
     products,
     promotions,
     paymentProviders,
+    company,
+    about,
   };
 }

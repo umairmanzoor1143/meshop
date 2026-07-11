@@ -2,26 +2,26 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CircleCheck, Package, Truck, Sparkles } from "lucide-react";
+import { CircleCheck, Package, Truck } from "lucide-react";
 import { useLocale } from "@/context/LocaleContext";
+import { useShopData } from "@/context/ShopDataContext";
 import { loadLastOrder, type LastOrder } from "@/lib/order";
 import { formatMoney } from "@/lib/format";
-import { getTenant } from "@/lib/theme";
-
-const tenant = getTenant(process.env.NEXT_PUBLIC_TENANT);
+import { companyEmail } from "@/lib/company";
 
 export function SuccessView() {
   const { t } = useLocale();
+  const { bundle } = useShopData();
   const [order, setOrder] = useState<LastOrder | null>(null);
 
   useEffect(() => {
     setOrder(loadLastOrder());
   }, []);
 
+  const email = companyEmail(bundle?.company ?? null);
   const steps = [
     { icon: Package, label: t.step1 },
     { icon: Truck, label: t.step2 },
-    { icon: Sparkles, label: t.step3 },
   ];
 
   return (
@@ -49,13 +49,14 @@ export function SuccessView() {
             <span className="text-sm text-brand-ink">{order.paymentName}</span>
           </div>
           <p className="mt-4 pt-4 border-t border-brand-ink/10 text-[11px] text-brand-gray leading-relaxed">
-            {t.payInstr}: {order.paymentName} · {tenant.contact.email}
+            {t.payInstr}: {order.paymentName}
+            {email ? ` · ${email}` : ""}
           </p>
         </div>
       )}
 
       {/* Next steps */}
-      <div className="grid grid-cols-3 gap-3 mb-12">
+      <div className="grid grid-cols-2 gap-3 mb-12">
         {steps.map(({ icon: Icon, label }, i) => (
           <div key={i} className="flex flex-col items-center gap-2.5">
             <span className="w-10 h-10 rounded-full border border-border flex items-center justify-center text-brand-ink/70">
