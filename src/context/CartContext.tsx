@@ -2,11 +2,17 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
+export interface CartUserInput {
+  fieldId: string;
+  value: string;
+}
+
 export interface CartItem {
-  key: string; // productId | variationId | sorted extra ids
+  key: string; // productId | variationId | sorted extra ids | sorted userInputs
   productId: string;
   variationId?: string;
   extraChoiceIds: string[];
+  userInputs?: CartUserInput[];
   qty: number;
 }
 
@@ -24,7 +30,18 @@ const CartContext = createContext<CartContextValue | null>(null);
 const STORAGE_KEY = "meshop.cart.v1";
 
 function lineKey(line: Omit<CartItem, "key">): string {
-  return [line.productId, line.variationId ?? "-", [...line.extraChoiceIds].sort().join("+")].join("|");
+  // Custom user inputs make a line distinct even with identical variation/extras
+  // (e.g. two stalls with different measurements must not merge).
+  const inputs = (line.userInputs ?? [])
+    .map((i) => `${i.fieldId}=${i.value}`)
+    .sort()
+    .join("+");
+  return [
+    line.productId,
+    line.variationId ?? "-",
+    [...line.extraChoiceIds].sort().join("+"),
+    inputs,
+  ].join("|");
 }
 
 export function CartProvider({ children }: { children: React.ReactNode }) {

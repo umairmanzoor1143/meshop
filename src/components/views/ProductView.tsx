@@ -8,10 +8,13 @@ import { useCart } from "@/context/CartContext";
 import { useLocale } from "@/context/LocaleContext";
 import {
   defaultVariation,
+  getVariation,
   variationEffectivePrice,
   unitPrice,
+  extrasTotal,
   hasOwnSale,
   bestPromotion,
+  cheapestChoice,
   effectiveAvailability,
 } from "@/lib/pricing";
 import { imageUrl } from "@/lib/image";
@@ -129,16 +132,26 @@ function ProductDetail({
     [product.extras]
   );
 
-  // Extras selection keyed by group. Required SINGLE groups default to first choice.
+  // Extras selection keyed by group. Required SINGLE groups default to their
+  // CHEAPEST choice so the opening PDP price matches the catalog "from" price.
   const [extrasByGroup, setExtrasByGroup] = useState<Record<string, string[]>>(() => {
     const init: Record<string, string[]> = {};
     for (const g of product.extras) {
-      if (g.required && g.selectionType === "SINGLE" && g.choices[0]) init[g.id] = [g.choices[0].id];
-      else init[g.id] = [];
+      const cheapest = g.required && g.selectionType === "SINGLE" ? cheapestChoice(g) : null;
+      init[g.id] = cheapest ? [cheapest.id] : [];
     }
     return init;
   });
   const [qty, setQty] = useState(1);
+
+  // Per-order custom inputs the merchant requires (e.g. width/depth in metres).
+  const userInputs = useMemo(
+    () => (product.userInputs ?? []).slice().sort((a, b) => a.name.localeCompare(b.name)),
+    [product.userInputs]
+  );
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
+  const setInputValue = (fieldId: string, value: string) =>
+    setInputValues((prev) => ({ ...prev, [fieldId]: value }));
 
   const flatExtras = useMemo(() => Object.values(extrasByGroup).flat(), [extrasByGroup]);
 
@@ -150,7 +163,11 @@ function ProductDetail({
   const onOwnSale = hasOwnSale(product, variationId);
   const promo = onOwnSale ? null : bestPromotion(product, unit, promotions);
   const unitNet = Math.max(0, unit - (promo?.discount ?? 0));
-  const discountPct = unit > 0 && unitNet < unit ? Math.round((1 - unitNet / unit) * 100) : 0;
+  // compareAt = configured price BEFORE any discount (gross variation price +
+  // extras), so the strike-through/badge shows the same discount as the card.
+  const grossUnit = (getVariation(product, variationId)?.price ?? 0) + extrasTotal(product, flatExtras);
+  const compareAt = grossUnit > unitNet ? grossUnit : null;
+  const discountPct = compareAt ? Math.round((1 - unitNet / compareAt) * 100) : 0;
   const lineTotal = unitNet * qty;
 
   const images = product.imageKeys
@@ -177,7 +194,23 @@ function ProductDetail({
         return;
       }
     }
-    add({ productId: product.id, variationId, extraChoiceIds: flatExtras, qty });
+    // Enforce required custom inputs are filled.
+    for (const f of userInputs) {
+      if (f.required && !(inputValues[f.id] ?? "").trim()) {
+        toast.error(`${tx(f.displayName)}: ${t.required}`);
+        return;
+      }
+    }
+    const filledInputs = userInputs
+      .map((f) => ({ fieldId: f.id, value: (inputValues[f.id] ?? "").trim() }))
+      .filter((i) => i.value !== "");
+    add({
+      productId: product.id,
+      variationId,
+      extraChoiceIds: flatExtras,
+      userInputs: filledInputs.length ? filledInputs : undefined,
+      qty,
+    });
     toast.success(t.addToCart, { description: tx(product.displayName) });
   }
 
@@ -257,7 +290,7 @@ function ProductDetail({
               <h1 className="font-serif text-2xl sm:text-3xl lg:text-5xl tracking-tight text-brand-ink font-normal mb-3 sm:mb-4 leading-tight">
                 {tx(product.displayName)}
               </h1>
-              <PriceTag size="lg" price={unitNet} currency={currency} />
+              <PriceTag size="lg" price={unitNet} compareAt={compareAt} discountPct={discountPct} currency={currency} />
               {taxRate > 0 && (
                 <p className="text-[11px] text-brand-gray mt-1">
                   {pricesIncludeTax ? fill(t.taxIncl, { rate: taxRate }) : fill(t.taxExcl, { rate: taxRate })}
@@ -346,6 +379,32 @@ function ProductDetail({
                 </div>
               </div>
             ))}
+
+            {/* Custom inputs the merchant requires per order (TEXT / NUMBER / DATE) */}
+            {userInputs.map((field) => {
+              const type =
+                field.inputType === "NUMBER" ? "number" : field.inputType === "DATE" ? "date" : "text";
+              return (
+                <div key={field.id} className="mb-6">
+                  <label htmlFor={`ui-${field.id}`} className="eyebrow text-brand-ink mb-3 flex items-center gap-2">
+                    {tx(field.displayName)}
+                    {field.required && (
+                      <span className="text-brand-gray normal-case tracking-normal text-[10px]">· {t.required}</span>
+                    )}
+                  </label>
+                  <input
+                    id={`ui-${field.id}`}
+                    type={type}
+                    inputMode={field.inputType === "NUMBER" ? "decimal" : undefined}
+                    maxLength={field.inputType === "TEXT" ? field.maxLength : undefined}
+                    required={field.required}
+                    value={inputValues[field.id] ?? ""}
+                    onChange={(e) => setInputValue(field.id, e.target.value)}
+                    className="w-full h-12 px-4 border border-brand-ink/20 rounded-md text-sm bg-card focus:outline-none focus:border-brand-ink transition-colors"
+                  />
+                </div>
+              );
+            })}
 
             {/* Quantity + add to cart */}
             <div className="flex gap-3 mb-5">

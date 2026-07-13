@@ -38,7 +38,7 @@ export function SuccessView() {
         <div className="bg-card border border-border rounded-md p-6 text-left mb-10">
           <div className="flex items-center justify-between pb-4 mb-4 border-b border-brand-ink/10">
             <span className="text-[11px] uppercase tracking-wider text-brand-gray">{t.orderRef}</span>
-            <span className="font-mono text-sm text-brand-ink">{order.ref}</span>
+            <span className="font-mono text-sm text-brand-ink">{order.bundleId}</span>
           </div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm text-brand-gray">{t.grand}</span>
@@ -69,12 +69,24 @@ export function SuccessView() {
         ))}
       </div>
 
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 bg-brand-ink text-white rounded-md px-8 py-3 text-xs tracking-widest uppercase font-medium hover:bg-brand-ink/90 transition-colors"
-      >
-        {t.continueShopping}
-      </Link>
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+        {order?.hubUrl && (
+          <a
+            href={order.hubUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 bg-brand-ink text-white rounded-md px-8 py-3 text-xs tracking-widest uppercase font-medium hover:bg-brand-green transition-colors"
+          >
+            {t.payOrder}
+          </a>
+        )}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2 border border-brand-ink/20 text-brand-ink rounded-md px-8 py-3 text-xs tracking-widest uppercase font-medium hover:border-brand-ink transition-colors"
+        >
+          {t.continueShopping}
+        </Link>
+      </div>
     </section>
   );
 }

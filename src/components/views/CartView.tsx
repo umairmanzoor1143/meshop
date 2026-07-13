@@ -65,7 +65,7 @@ export function CartView() {
           <div className="border-t border-brand-ink/10">
             {summary.lines.map((line) => {
               const name = tx(line.product.displayName);
-              const config = describeLineConfig(line.product, line.variationId, line.extraChoiceIds, tx);
+              const config = describeLineConfig(line.product, line.variationId, line.extraChoiceIds, tx, line.userInputs);
               return (
                 <div key={line.key} className="flex gap-4 py-6 border-b border-brand-ink/10">
                   <Link

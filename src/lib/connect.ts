@@ -31,12 +31,14 @@ const SHOP_ID = process.env.CONNECT_SHOP_ID ?? "";
 // The company webservice keys on companyId. For a company-owned shop this is the
 // shop's ownerId; override with CONNECT_COMPANY_ID when they differ.
 const COMPANY_ID = process.env.CONNECT_COMPANY_ID ?? process.env.CONNECT_OWNER_ID ?? "";
-const REVALIDATE = 60; // seconds — ISR cache window for catalog data
 
 async function connectGet<T>(path: string): Promise<T> {
+  // Always fetch live from the backend — catalog/price/promotion edits must show
+  // immediately (no stale cache to clear). Caching can be reintroduced later via
+  // an on-demand revalidate webhook if backend load becomes a concern.
   const res = await fetch(`${BASE}${path}`, {
     headers: { "connect-token": TOKEN, accept: "application/json" },
-    next: { revalidate: REVALIDATE },
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(`connect GET ${path} -> ${res.status}`);
   return (await res.json()) as T;

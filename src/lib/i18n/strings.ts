@@ -30,11 +30,11 @@ export interface Strings {
   taxIncl: string; taxExcl: string;
   // checkout
   contact: string; firstName: string; lastName: string; email: string; phone: string;
-  fulfillment: string; addr: string; street: string; zip: string; city: string;
+  fulfillment: string; addr: string; street: string; streetNumber: string; zip: string; city: string; country: string; notesLabel: string;
   standard: string; premium: string; freeUnlocked: string; pickupLabel: string;
   payTitle: string; placeOrder: string; termsLbl: string; addMoreForFree: string;
   // success
-  successTitle: string; successText: string; orderRef: string; payInstr: string; nextSteps: string;
+  successTitle: string; successText: string; orderRef: string; payInstr: string; nextSteps: string; payOrder: string;
   step1: string; step2: string;
   // account
   myAccount: string; orders: string; profile: string; addresses: string; logout: string; orderHist: string;
@@ -59,10 +59,10 @@ const de: Strings = {
   emptyCart: "Dein Warenkorb ist leer", backToShop: "Zurück zum Shop", continueShopping: "Weiter einkaufen",
   taxIncl: "inkl. {rate} % MwSt", taxExcl: "zzgl. {rate} % MwSt",
   contact: "Kontaktangaben", firstName: "Vorname", lastName: "Nachname", email: "E-Mail", phone: "Telefon (für Lieferung)",
-  fulfillment: "Versandart", addr: "Lieferadresse", street: "Strasse & Nr.", zip: "PLZ", city: "Ort",
+  fulfillment: "Versandart", addr: "Adresse", street: "Strasse", streetNumber: "Nr.", zip: "PLZ", city: "Ort", country: "Land", notesLabel: "Anmerkungen",
   standard: "Standard", premium: "Premium", freeUnlocked: "Gratis-Lieferung freigeschaltet", pickupLabel: "Abholung",
   payTitle: "Zahlungsart", placeOrder: "Bestellung abschliessen", termsLbl: "Ich akzeptiere die AGB und Datenschutzerklärung", addMoreForFree: "Noch {amount} bis zur Gratis-Lieferung",
-  successTitle: "Vielen Dank für deine Bestellung!", successText: "Eine Bestätigung wurde an deine E-Mail-Adresse gesendet. Wir informieren dich, sobald deine Bestellung versandt wird.", orderRef: "Bestellnummer", payInstr: "Zahlungshinweise", nextSteps: "Nächste Schritte",
+  successTitle: "Vielen Dank für deine Bestellung!", successText: "Eine Bestätigung wurde an deine E-Mail-Adresse gesendet. Wir informieren dich, sobald deine Bestellung versandt wird.", orderRef: "Bestellnummer", payInstr: "Zahlungshinweise", nextSteps: "Nächste Schritte", payOrder: "Bestellung ansehen & bezahlen",
   step1: "Bestellung wird kommissioniert", step2: "Versand / Bereitstellung zur Abholung",
   myAccount: "Mein Konto", orders: "Bestellungen", profile: "Profil", addresses: "Adressen", logout: "Abmelden", orderHist: "Bestellverlauf",
   footerTerms: "AGB", contactInfo: "Kontaktangaben",
@@ -85,10 +85,10 @@ const en: Strings = {
   emptyCart: "Your cart is empty", backToShop: "Back to shop", continueShopping: "Continue shopping",
   taxIncl: "incl. {rate}% VAT", taxExcl: "plus {rate}% VAT",
   contact: "Contact details", firstName: "First name", lastName: "Last name", email: "Email", phone: "Phone (for delivery)",
-  fulfillment: "Fulfillment", addr: "Delivery address", street: "Street & no.", zip: "ZIP", city: "City",
+  fulfillment: "Fulfillment", addr: "Address", street: "Street", streetNumber: "No.", zip: "ZIP", city: "City", country: "Country", notesLabel: "Notes",
   standard: "Standard", premium: "Premium", freeUnlocked: "Free delivery unlocked", pickupLabel: "Pickup",
   payTitle: "Payment method", placeOrder: "Place order", termsLbl: "I accept the terms & privacy policy", addMoreForFree: "{amount} more for free delivery",
-  successTitle: "Thank you for your order!", successText: "A confirmation has been sent to your email address. We'll let you know as soon as your order ships.", orderRef: "Order number", payInstr: "Payment instructions", nextSteps: "Next steps",
+  successTitle: "Thank you for your order!", successText: "A confirmation has been sent to your email address. We'll let you know as soon as your order ships.", orderRef: "Order number", payInstr: "Payment instructions", nextSteps: "Next steps", payOrder: "View & pay order",
   step1: "Order is being picked", step2: "Shipping / ready for pickup",
   myAccount: "My account", orders: "Orders", profile: "Profile", addresses: "Addresses", logout: "Log out", orderHist: "Order history",
   footerTerms: "Terms", contactInfo: "Contact",
@@ -111,10 +111,10 @@ const fr: Strings = {
   emptyCart: "Votre panier est vide", backToShop: "Retour à la boutique", continueShopping: "Continuer",
   taxIncl: "TVA {rate} % incl.", taxExcl: "TVA {rate} % en sus",
   contact: "Coordonnées", firstName: "Prénom", lastName: "Nom", email: "E-mail", phone: "Téléphone (pour la livraison)",
-  fulfillment: "Mode de réception", addr: "Adresse de livraison", street: "Rue & n°", zip: "NPA", city: "Localité",
+  fulfillment: "Mode de réception", addr: "Adresse", street: "Rue", streetNumber: "N°", zip: "NPA", city: "Localité", country: "Pays", notesLabel: "Remarques",
   standard: "Standard", premium: "Premium", freeUnlocked: "Livraison gratuite débloquée", pickupLabel: "Retrait",
   payTitle: "Paiement", placeOrder: "Passer commande", termsLbl: "J'accepte les CGV et la politique de confidentialité", addMoreForFree: "Encore {amount} pour la livraison gratuite",
-  successTitle: "Merci pour votre commande !", successText: "Une confirmation a été envoyée à votre adresse e-mail. Nous vous informerons dès l'expédition.", orderRef: "Numéro de commande", payInstr: "Instructions de paiement", nextSteps: "Prochaines étapes",
+  successTitle: "Merci pour votre commande !", successText: "Une confirmation a été envoyée à votre adresse e-mail. Nous vous informerons dès l'expédition.", orderRef: "Numéro de commande", payInstr: "Instructions de paiement", nextSteps: "Prochaines étapes", payOrder: "Voir & payer la commande",
   step1: "Commande en préparation", step2: "Expédition / prête au retrait",
   myAccount: "Mon compte", orders: "Commandes", profile: "Profil", addresses: "Adresses", logout: "Déconnexion", orderHist: "Historique",
   footerTerms: "CGV", contactInfo: "Contact",
@@ -137,10 +137,10 @@ const it: Strings = {
   emptyCart: "Il carrello è vuoto", backToShop: "Torna al negozio", continueShopping: "Continua",
   taxIncl: "IVA {rate} % incl.", taxExcl: "IVA {rate} % escl.",
   contact: "Contatti", firstName: "Nome", lastName: "Cognome", email: "E-mail", phone: "Telefono (per la consegna)",
-  fulfillment: "Modalità", addr: "Indirizzo di consegna", street: "Via e n.", zip: "CAP", city: "Località",
+  fulfillment: "Modalità", addr: "Indirizzo", street: "Via", streetNumber: "N.", zip: "CAP", city: "Località", country: "Paese", notesLabel: "Note",
   standard: "Standard", premium: "Premium", freeUnlocked: "Consegna gratuita sbloccata", pickupLabel: "Ritiro",
   payTitle: "Pagamento", placeOrder: "Ordina", termsLbl: "Accetto termini e privacy", addMoreForFree: "Ancora {amount} per la consegna gratuita",
-  successTitle: "Grazie per il tuo ordine!", successText: "Una conferma è stata inviata al tuo indirizzo e-mail. Ti avviseremo appena l'ordine viene spedito.", orderRef: "Numero ordine", payInstr: "Istruzioni di pagamento", nextSteps: "Prossimi passi",
+  successTitle: "Grazie per il tuo ordine!", successText: "Una conferma è stata inviata al tuo indirizzo e-mail. Ti avviseremo appena l'ordine viene spedito.", orderRef: "Numero ordine", payInstr: "Istruzioni di pagamento", nextSteps: "Prossimi passi", payOrder: "Vedi e paga l'ordine",
   step1: "Ordine in preparazione", step2: "Spedizione / pronto per il ritiro",
   myAccount: "Il mio account", orders: "Ordini", profile: "Profilo", addresses: "Indirizzi", logout: "Esci", orderHist: "Storico ordini",
   footerTerms: "Termini", contactInfo: "Contatti",

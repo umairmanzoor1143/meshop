@@ -9,7 +9,8 @@ export function describeLineConfig(
   product: PublicShopProduct,
   variationId: string | undefined,
   extraChoiceIds: string[],
-  tx: (t: TextTranslation | undefined) => string
+  tx: (t: TextTranslation | undefined) => string,
+  userInputs?: { fieldId: string; value: string }[]
 ): string[] {
   const parts: string[] = [];
   if (product.variations.length > 1) {
@@ -21,6 +22,11 @@ export function describeLineConfig(
     for (const choice of group.choices) {
       if (chosen.has(choice.id)) parts.push(tx(choice.displayName));
     }
+  }
+  // Custom per-order inputs, shown as "Label: value".
+  for (const input of userInputs ?? []) {
+    const field = product.userInputs?.find((f) => f.id === input.fieldId);
+    if (field && input.value) parts.push(`${tx(field.displayName)}: ${input.value}`);
   }
   return parts;
 }

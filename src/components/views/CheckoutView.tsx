@@ -8,9 +8,10 @@ import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useCartLines } from "@/context/useCartLines";
 import { useLocale } from "@/context/LocaleContext";
-import { computeCart, type DeliveryTier } from "@/lib/pricing";
+import { computeCart, defaultVariation, type DeliveryTier } from "@/lib/pricing";
 import { describeLineConfig } from "@/lib/lineLabel";
-import { createOrderRef, submitOrder } from "@/lib/order";
+import { submitOrder, rememberLastOrder, OrderError } from "@/lib/order";
+import type { PublicShopProduct } from "@/lib/types";
 import { formatMoney } from "@/lib/format";
 import { companyPickupInfo } from "@/lib/company";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,18 @@ export function CheckoutView() {
   if (loading) return <PageLoading />;
   if (error || !bundle) return <PageError />;
   return <CheckoutForm bundle={bundle} />;
+}
+
+/** Resolve a line's flat extra-choice ids into the backend's {groupId, choiceId} pairs. */
+function extrasForLine(product: PublicShopProduct, choiceIds: string[]): { groupId: string; choiceId: string }[] {
+  const chosen = new Set(choiceIds);
+  const out: { groupId: string; choiceId: string }[] = [];
+  for (const g of product.extras) {
+    for (const c of g.choices) {
+      if (chosen.has(c.id)) out.push({ groupId: g.id, choiceId: c.id });
+    }
+  }
+  return out;
 }
 
 function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
@@ -49,7 +62,18 @@ function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
   const methods = productModeLists.length && constrained.length ? constrained : shopMethods;
   const activeProviders = paymentProviders.filter((p) => p.isActive);
 
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phone: "", street: "", zip: "", city: "" });
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    street: "",
+    streetNumber: "",
+    zip: "",
+    city: "",
+    country: "CH",
+  });
+  const [notes, setNotes] = useState("");
   const [fulfillment, setFulfillment] = useState<FulfillmentMode>(methods[0]);
   const [tier, setTier] = useState<DeliveryTier>("standard");
   const [paymentId, setPaymentId] = useState(
@@ -91,23 +115,54 @@ function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
   async function placeOrder() {
     if (!form.firstName || !form.lastName || !form.email) return toast.error(t.contact);
     if (settings.checkoutBehaviourSettings.requirePhoneNumber && !form.phone) return toast.error(t.phone);
-    if (fulfillment === "DELIVERY" && (!form.street || !form.zip || !form.city)) return toast.error(t.addr);
+    if (!form.street || !form.zip || !form.city || !form.country) return toast.error(t.addr);
     if (!paymentId) return toast.error(t.payTitle);
     if (!terms) return toast.error(t.termsLbl);
 
     const provider = activeProviders.find((p) => p.id === paymentId)!;
+    const address = {
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim() || undefined,
+      street: form.street.trim(),
+      streetNumber: form.streetNumber.trim(),
+      zip: form.zip.trim(),
+      city: form.city.trim(),
+      country: form.country.trim().toUpperCase(),
+    };
+    // Map each cart line into the backend's item shape (extras as {groupId, choiceId}).
+    const items = lines.map((l) => ({
+      productId: l.product.id,
+      variationId: l.variationId ?? defaultVariation(l.product)?.id,
+      quantity: l.qty,
+      extras: extrasForLine(l.product, l.extraChoiceIds),
+      userInputs: l.userInputs ?? [],
+    }));
+
     setSubmitting(true);
     try {
-      await submitOrder({
-        ref: createOrderRef(),
+      const result = await submitOrder({
+        items,
+        paymentProviderId: paymentId,
+        fulfillmentMode: fulfillment,
+        deliveryType: fulfillment === "DELIVERY" ? (tier === "premium" ? "PREMIUM" : "STANDARD") : undefined,
+        invoiceAddress: address,
+        deliveryAddress: address,
+        notes: notes.trim() || undefined,
+      });
+      rememberLastOrder({
+        bundleId: result.bundleId,
         grand: summary.grand,
-        paymentType: provider.provider,
         paymentName: provider.name,
         fulfillment,
-        email: form.email,
+        email: address.email,
+        hubUrl: result.hubUrl,
       });
       clear();
       router.push("/checkout/success");
+    } catch (err) {
+      toast.error(err instanceof OrderError && err.message ? err.message : "Order could not be placed");
     } finally {
       setSubmitting(false);
     }
@@ -138,6 +193,19 @@ function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
             </div>
           </div>
 
+          {/* Address (used as invoice + delivery address; required by the backend
+              for every order, including pickup) */}
+          <div>
+            <h2 className="eyebrow text-brand-ink mb-4">{t.addr}</h2>
+            <div className="grid grid-cols-6 gap-4">
+              <Field id="street" label={t.street} value={form.street} onChange={set("street")} className="col-span-4" />
+              <Field id="streetNumber" label={t.streetNumber} value={form.streetNumber} onChange={set("streetNumber")} className="col-span-2" />
+              <Field id="zip" label={t.zip} value={form.zip} onChange={set("zip")} className="col-span-2" />
+              <Field id="city" label={t.city} value={form.city} onChange={set("city")} className="col-span-4" />
+              <Field id="country" label={t.country} value={form.country} onChange={set("country")} className="col-span-2" />
+            </div>
+          </div>
+
           {/* Fulfillment */}
           <div>
             <h2 className="eyebrow text-brand-ink mb-4">{t.fulfillment}</h2>
@@ -149,23 +217,14 @@ function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
               ))}
             </div>
 
-            {fulfillment === "DELIVERY" && (
-              <div className="mt-5 space-y-4">
-                <div className="grid grid-cols-6 gap-4">
-                  <Field id="street" label={t.street} value={form.street} onChange={set("street")} className="col-span-6" />
-                  <Field id="zip" label={t.zip} value={form.zip} onChange={set("zip")} className="col-span-2" />
-                  <Field id="city" label={t.city} value={form.city} onChange={set("city")} className="col-span-4" />
-                </div>
-                {settings.orderManagementSettings.deliveryPrices && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <SelectCard selected={tier === "standard"} onClick={() => setTier("standard")}>
-                      {t.standard} · {formatMoney(settings.orderManagementSettings.deliveryPrices.standard, currency)}
-                    </SelectCard>
-                    <SelectCard selected={tier === "premium"} onClick={() => setTier("premium")}>
-                      {t.premium} · {formatMoney(settings.orderManagementSettings.deliveryPrices.premium, currency)}
-                    </SelectCard>
-                  </div>
-                )}
+            {fulfillment === "DELIVERY" && settings.orderManagementSettings.deliveryPrices && (
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <SelectCard selected={tier === "standard"} onClick={() => setTier("standard")}>
+                  {t.standard} · {formatMoney(settings.orderManagementSettings.deliveryPrices.standard, currency)}
+                </SelectCard>
+                <SelectCard selected={tier === "premium"} onClick={() => setTier("premium")}>
+                  {t.premium} · {formatMoney(settings.orderManagementSettings.deliveryPrices.premium, currency)}
+                </SelectCard>
               </div>
             )}
 
@@ -204,6 +263,17 @@ function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
               ))}
             </div>
           </div>
+
+          {/* Optional order notes */}
+          <div>
+            <h2 className="eyebrow text-brand-ink mb-4">{t.notesLabel}</h2>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="w-full px-4 py-3 border border-brand-ink/20 rounded-md text-sm bg-card focus:outline-none focus:border-brand-ink transition-colors resize-y"
+            />
+          </div>
         </div>
 
         {/* Summary */}
@@ -211,7 +281,7 @@ function CheckoutForm({ bundle }: { bundle: PublicShopBundle }) {
           <div className="bg-card border border-border rounded-md p-6 lg:sticky lg:top-28">
             <div className="space-y-3 pb-5 mb-5 border-b border-brand-ink/10">
               {summary.lines.map((line) => {
-                const cfg = describeLineConfig(line.product, line.variationId, line.extraChoiceIds, tx);
+                const cfg = describeLineConfig(line.product, line.variationId, line.extraChoiceIds, tx, line.userInputs);
                 return (
                   <div key={line.key} className="flex items-start justify-between gap-3 text-xs">
                     <span className="text-brand-ink">

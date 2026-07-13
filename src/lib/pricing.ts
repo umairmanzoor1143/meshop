@@ -67,6 +67,27 @@ export function variationEffectivePrice(variation: ProductVariation | undefined,
   return { price: variation.price, compareAt: null };
 }
 
+/** Cheapest choice (lowest price modifier) of an extra group, or null when empty. */
+export function cheapestChoice(group: PublicShopProduct["extras"][number]) {
+  if (!group.choices.length) return null;
+  return group.choices.reduce((min, c) => (c.priceModifier < min.priceModifier ? c : min));
+}
+
+/**
+ * Minimum mandatory extras cost: for every active, required group the customer
+ * MUST pick, add its cheapest choice. This is the true floor a "from" price must
+ * include so the catalog card and a freshly-opened PDP show the same number.
+ */
+export function minRequiredExtrasTotal(product: PublicShopProduct): number {
+  let sum = 0;
+  for (const g of product.extras) {
+    if (!g.isActive || !g.required) continue;
+    const c = cheapestChoice(g);
+    if (c) sum += c.priceModifier;
+  }
+  return sum;
+}
+
 /** Sum of selected extra choice price modifiers. */
 export function extrasTotal(product: PublicShopProduct, extraChoiceIds: string[]): number {
   if (!extraChoiceIds.length) return 0;
@@ -109,11 +130,16 @@ export function catalogPrice(
   promotions: PublicShopPromotion[],
   now = new Date()
 ): { price: number; compareAt: number | null; discountPct: number } {
+  // "From" price = cheapest configuration: default variation + the mandatory
+  // minimum required-extras cost. This matches a freshly-opened PDP.
+  const reqExtras = minRequiredExtrasTotal(product);
   const eff = variationEffectivePrice(defaultVariation(product), now);
+  const ownSalePrice = eff.price + reqExtras;
   if (eff.compareAt && eff.compareAt > eff.price) {
-    return { price: eff.price, compareAt: eff.compareAt, discountPct: Math.round((1 - eff.price / eff.compareAt) * 100) };
+    const compareAt = eff.compareAt + reqExtras;
+    return { price: ownSalePrice, compareAt, discountPct: Math.round((1 - ownSalePrice / compareAt) * 100) };
   }
-  const base = eff.price;
+  const base = ownSalePrice;
   const promo = bestPromotion(product, base, promotions, now);
   if (promo && promo.discount > 0) {
     const price = Math.max(0, base - promo.discount);
@@ -203,6 +229,7 @@ export interface CartLineInput {
   product: PublicShopProduct;
   variationId?: string;
   extraChoiceIds: string[];
+  userInputs?: { fieldId: string; value: string }[];
   qty: number;
 }
 

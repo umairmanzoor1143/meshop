@@ -18,7 +18,14 @@ export function useCartLines(products: PublicShopProduct[]): JoinedCartLine[] {
       .map((it): JoinedCartLine | null => {
         const product = byId.get(it.productId);
         if (!product) return null;
-        return { key: it.key, product, variationId: it.variationId, extraChoiceIds: it.extraChoiceIds, qty: it.qty };
+        return {
+          key: it.key,
+          product,
+          variationId: it.variationId,
+          extraChoiceIds: it.extraChoiceIds,
+          userInputs: it.userInputs,
+          qty: it.qty,
+        };
       })
       .filter((x): x is JoinedCartLine => x !== null);
   }, [items, products]);

@@ -16,7 +16,7 @@ async function baseUrl(): Promise<string> {
 }
 
 async function apiGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${await baseUrl()}/api/shop${path}`, { next: { revalidate: 60 } });
+  const res = await fetch(`${await baseUrl()}/api/shop${path}`, { cache: "no-store" });
   if (!res.ok) throw new Error(`GET /api/shop${path} -> ${res.status}`);
   return (await res.json()) as T;
 }

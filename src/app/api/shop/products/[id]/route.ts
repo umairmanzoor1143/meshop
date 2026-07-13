@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { loadProduct } from "@/lib/connect";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 // Next 16: dynamic route `params` is a Promise and must be awaited.
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {

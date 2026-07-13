@@ -151,6 +151,18 @@ export interface ProductAvailability {
   availableTo?: string;
 }
 
+export type UserInputType = "TEXT" | "NUMBER" | "DATE";
+
+export interface ProductUserInput {
+  id: string;
+  name: string;
+  displayName: TextTranslation;
+  inputType: UserInputType;
+  required: boolean;
+  maxLength?: number;
+  updated: string;
+}
+
 export interface PublicShopProduct {
   id: string;
   shopId: string;
@@ -163,6 +175,7 @@ export interface PublicShopProduct {
   taxRate: number;
   variations: ProductVariation[];
   extras: ProductExtraGroup[];
+  userInputs: ProductUserInput[];
   availability: ProductAvailability;
   fulfillmentModes?: FulfillmentMode[];
   limitedOffer?: LimitedOffer;

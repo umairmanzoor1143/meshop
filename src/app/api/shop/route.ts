@@ -4,7 +4,7 @@ import { loadBundle } from "@/lib/connect";
 // Aggregate storefront payload (settings + categories + products + promotions +
 // paymentProviders), composed from the /connect endpoints. This is the single
 // call the storefront page uses on load.
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {

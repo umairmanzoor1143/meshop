@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { useLocale } from "@/context/LocaleContext";
-import { catalogPrice, defaultVariation, effectiveAvailability } from "@/lib/pricing";
+import { catalogPrice, defaultVariation, cheapestChoice, effectiveAvailability } from "@/lib/pricing";
 import { productImageUrl } from "@/lib/image";
 import { PriceTag } from "@/components/PriceTag";
 import { AvailabilityBadge } from "@/components/AvailabilityBadge";
@@ -27,8 +28,14 @@ export function ProductCard({
 }) {
   const { add } = useCart();
   const { tx, t } = useLocale();
+  const router = useRouter();
 
   const href = `/product/${product.id}`;
+  // Products with required custom inputs (or required extras) can't be added with
+  // defaults — send the shopper to the detail page to configure them.
+  const needsConfig =
+    (product.userInputs ?? []).some((u) => u.required) ||
+    product.extras.some((g) => g.isActive && g.required && g.selectionType === "MULTIPLE");
   const name = tx(product.displayName) || t.product;
   const price = catalogPrice(product, promotions);
   const availability = effectiveAvailability(product);
@@ -38,10 +45,15 @@ export function ProductCard({
   function quickAdd(e: React.MouseEvent) {
     e.preventDefault();
     if (unavailable) return;
-    // Pick sensible defaults: default variation + first choice of each required group.
+    // Anything needing per-order configuration goes to the detail page.
+    if (needsConfig) {
+      router.push(href);
+      return;
+    }
+    // Pick sensible defaults: default variation + cheapest choice of each required SINGLE group.
     const requiredExtras = product.extras
-      .filter((g) => g.required && g.choices.length)
-      .map((g) => g.choices[0].id);
+      .filter((g) => g.isActive && g.required && g.selectionType === "SINGLE" && g.choices.length)
+      .map((g) => cheapestChoice(g)!.id);
     add({
       productId: product.id,
       variationId: defaultVariation(product)?.id,
