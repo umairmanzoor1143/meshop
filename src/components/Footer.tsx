@@ -100,6 +100,7 @@ export function Footer() {
           <h4 className="eyebrow text-white mb-6">{t.contactInfo}</h4>
           <ul className="space-y-3 text-sm text-white/75">
             <li><Link href="/cart" className="hover:text-white transition-colors">{t.cart}</Link></li>
+            <li><Link href="/order" className="hover:text-white transition-colors">{t.trackTitle}</Link></li>
             {email && (
               <li><a href={`mailto:${email}`} className="hover:text-white transition-colors">{t.contact}</a></li>
             )}

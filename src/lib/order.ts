@@ -1,6 +1,6 @@
 "use client";
 
-import type { FulfillmentMode } from "./types";
+import type { FulfillmentMode, OrderOverview, ReauthConfirmResult } from "./types";
 
 // Client-side order submission. Posts to our own /api/order route handler, which
 // forwards to the me platform place-order endpoint with the server-held service
@@ -87,4 +87,38 @@ export function loadLastOrder(): LastOrder | null {
   } catch {
     return null;
   }
+}
+
+// ---- Guest order re-access (view an order later) ---------------------------
+
+/** Fetch the order overview with an order:read token. */
+export async function fetchOrderOverview(token: string): Promise<OrderOverview> {
+  const res = await fetch(`/api/order/overview?token=${encodeURIComponent(token)}`, { cache: "no-store" });
+  if (!res.ok) throw new OrderError("overview_failed");
+  return (await res.json()) as OrderOverview;
+}
+
+/** Step 1: email a 2FA code to the address on the order. Never throws on unknown orders. */
+export async function requestOrderCode(orderReference: string, email: string): Promise<void> {
+  await fetch("/api/order/reauth", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "request", orderReference, email }),
+  });
+}
+
+/** Step 2: confirm the code, returning an order:read token + metadata. */
+export async function confirmOrderCode(
+  orderReference: string,
+  email: string,
+  code: string
+): Promise<ReauthConfirmResult> {
+  const res = await fetch("/api/order/reauth", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "confirm", orderReference, email, code }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new OrderError((data as { message?: string }).message || "invalid_code");
+  return data as ReauthConfirmResult;
 }

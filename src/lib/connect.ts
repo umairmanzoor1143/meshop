@@ -9,28 +9,35 @@ import type {
   PublicShopPaymentProvider,
   PublicCompany,
   CompanyAbout,
+  OrderOverview,
+  ReauthConfirmResult,
 } from "./types";
 
 // ---------------------------------------------------------------------------
-// Server-only client for onra's `/connect` shop API.
+// Server-only client for onra's e-shop API.
 //
 // The connect-token is read from a server env var and sent as the
 // `connect-token` header. This module is imported ONLY by the route handlers in
-// src/app/api/shop/** — never by a client component — so the token never reaches
-// the browser. `import "server-only"` makes that a build-time guarantee.
+// src/app/api/** — never by a client component — so the token never reaches the
+// browser. `import "server-only"` makes that a build-time guarantee.
 //
-// Bruno recommends one aggregate call (`GET /connect/shop`), but that endpoint
-// currently 500s on the dev backend until DETAILS_ENCRYPTION_DECRYPTION_KEY is
-// configured, so we compose the storefront from the per-resource endpoints,
-// which are live. Switch loadBundle() back to the aggregate once it is fixed.
+// Catalog + checkout endpoints moved from `/connect/shop/*` to `/e-shop/*`
+// (Bruno, 2026-07-15). The base is configurable via CONNECT_SHOP_BASE so we can
+// point at the old `/connect/shop` path until the new backend is redeployed.
+// Ordering is GUEST checkout via the connect-token (no account/Bearer needed):
+// POST {SHOP_BASE}/checkout/place-order returns a bundle + an order:read JWT +
+// a hub URL. Company identity stays on `/connect/company/*` (not an e-shop feature).
 // ---------------------------------------------------------------------------
 
 const BASE = (process.env.CONNECT_API_BASE_URL ?? "http://localhost:5000").replace(/\/$/, "");
 const TOKEN = process.env.CONNECT_TOKEN ?? "";
 const SHOP_ID = process.env.CONNECT_SHOP_ID ?? "";
-// The company webservice keys on companyId. For a company-owned shop this is the
-// shop's ownerId; override with CONNECT_COMPANY_ID when they differ.
-const COMPANY_ID = process.env.CONNECT_COMPANY_ID ?? process.env.CONNECT_OWNER_ID ?? "";
+// Shop/checkout base path. Default is the new `/e-shop`; set CONNECT_SHOP_BASE=/connect/shop
+// to run against a backend that has not been redeployed with the rename yet.
+const SHOP_BASE = (process.env.CONNECT_SHOP_BASE ?? "/e-shop").replace(/\/$/, "");
+// Company identity (name/logo/contact) for COMPANY-owned shops. Optional — an
+// association-owned shop has no company profile, so leave it unset there.
+const COMPANY_ID = process.env.CONNECT_COMPANY_ID ?? "";
 
 async function connectGet<T>(path: string): Promise<T> {
   // Always fetch live from the backend — catalog/price/promotion edits must show
@@ -47,19 +54,19 @@ async function connectGet<T>(path: string): Promise<T> {
 // Per-resource loaders — one per public endpoint. The API route handlers call
 // these directly; the storefront pages then call those handlers.
 export function loadSettings(shopId = SHOP_ID): Promise<PublicShopSettings> {
-  return connectGet<PublicShopSettings>(`/connect/shop/${shopId}/settings`);
+  return connectGet<PublicShopSettings>(`${SHOP_BASE}/${shopId}/settings`);
 }
 export function loadCategories(shopId = SHOP_ID): Promise<PublicShopCategory[]> {
-  return connectGet<PublicShopCategory[]>(`/connect/shop/${shopId}/categories`);
+  return connectGet<PublicShopCategory[]>(`${SHOP_BASE}/${shopId}/categories`);
 }
 export function loadProducts(shopId = SHOP_ID): Promise<PublicShopProduct[]> {
-  return connectGet<PublicShopProduct[]>(`/connect/shop/${shopId}/products`);
+  return connectGet<PublicShopProduct[]>(`${SHOP_BASE}/${shopId}/products`);
 }
 export function loadPromotions(shopId = SHOP_ID): Promise<PublicShopPromotion[]> {
-  return connectGet<PublicShopPromotion[]>(`/connect/shop/${shopId}/promotions`);
+  return connectGet<PublicShopPromotion[]>(`${SHOP_BASE}/${shopId}/promotions`);
 }
 export function loadProduct(id: string, shopId = SHOP_ID): Promise<PublicShopProduct> {
-  return connectGet<PublicShopProduct>(`/connect/shop/${shopId}/products/${id}`);
+  return connectGet<PublicShopProduct>(`${SHOP_BASE}/${shopId}/products/${id}`);
 }
 
 /**
@@ -71,7 +78,7 @@ export function loadProduct(id: string, shopId = SHOP_ID): Promise<PublicShopPro
  */
 export async function loadPaymentProviders(shopId = SHOP_ID): Promise<PublicShopPaymentProvider[]> {
   try {
-    return await connectGet<PublicShopPaymentProvider[]>(`/connect/shop/${shopId}/paymentProviders`);
+    return await connectGet<PublicShopPaymentProvider[]>(`${SHOP_BASE}/${shopId}/paymentProviders`);
   } catch (err) {
     console.warn("[meshop] paymentProviders endpoint unavailable, using Swiss defaults:", err);
     const updated = new Date(0).toISOString();
@@ -109,6 +116,90 @@ export async function loadCompanyAbout(companyId = COMPANY_ID): Promise<CompanyA
   }
 }
 
+// ---------------------------------------------------------------------------
+// Guest ordering (connect-token). No account / Bearer token: the buyer is a
+// guest and the backend returns an order:read JWT + hub URL for viewing/paying.
+// ---------------------------------------------------------------------------
+
+export interface PlaceOrderResult {
+  bundleId: string;
+  accessToken: string; // order:read JWT (7-day) — use with the overview/hub
+  hubUrl: string;
+  hubApiUrl: string;
+  orderIds: string[];
+}
+
+/** POST {SHOP_BASE}/checkout/place-order as a guest, authenticated by the connect-token. */
+export async function placeGuestOrder(payload: unknown): Promise<PlaceOrderResult> {
+  const res = await fetch(`${BASE}${SHOP_BASE}/checkout/place-order`, {
+    method: "POST",
+    headers: { "connect-token": TOKEN, "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    let message = `place-order ${res.status}`;
+    try {
+      message = (JSON.parse(text).message as string) || message;
+    } catch {
+      /* keep default */
+    }
+    const err = new Error(message) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  return JSON.parse(text) as PlaceOrderResult;
+}
+
+// ---- Guest order access (public — no connect-token) ------------------------
+// These routes are public and token/2FA-scoped, so they are NOT under SHOP_BASE
+// and do not carry the connect-token.
+
+async function publicGet<T>(path: string): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, { headers: { accept: "application/json" }, cache: "no-store" });
+  if (!res.ok) throw new Error(`GET ${path} -> ${res.status}`);
+  return (await res.json()) as T;
+}
+
+async function publicPost<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    let message = `POST ${path} -> ${res.status}`;
+    try {
+      message = (JSON.parse(text).message as string) || message;
+    } catch {
+      /* keep default */
+    }
+    const err = new Error(message) as Error & { status?: number };
+    err.status = res.status;
+    throw err;
+  }
+  return JSON.parse(text) as T;
+}
+
+/** Order overview by the order:read JWT (from placeGuestOrder or re-auth confirm). */
+export function getOrderOverview(token: string): Promise<OrderOverview> {
+  return publicGet<OrderOverview>(`/shop/orders/public/overview?token=${encodeURIComponent(token)}`);
+}
+
+/** Step 1 of guest re-access: email a 2FA code to the address on the order.
+ *  Always resolves { status: "accepted" } (never reveals whether the order exists). */
+export function requestOrderReauth(orderReference: string, email: string): Promise<{ status: string }> {
+  return publicPost(`/shop/orders/public/re-auth/request`, { orderReference, email });
+}
+
+/** Step 2: confirm the 2FA code; returns a fresh access token + order metadata. */
+export function confirmOrderReauth(orderReference: string, email: string, code: string): Promise<ReauthConfirmResult> {
+  return publicPost<ReauthConfirmResult>(`/shop/orders/public/re-auth/confirm`, { orderReference, email, code });
+}
+
 /** Compose the full storefront bundle from the per-resource endpoints. */
 export async function loadBundle(shopId = SHOP_ID): Promise<PublicShopBundle> {
   const [settings, categories, products, promotions, paymentProviders, company, about] =
@@ -122,7 +213,7 @@ export async function loadBundle(shopId = SHOP_ID): Promise<PublicShopBundle> {
       loadCompanyAbout(),
     ]);
   return {
-    ownerId: process.env.CONNECT_OWNER_ID ?? "",
+    ownerId: "",
     shopId,
     settings,
     categories,

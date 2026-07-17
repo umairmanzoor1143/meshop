@@ -84,6 +84,13 @@ export interface CheckoutBehaviourSettings {
   minimumQuantitySurcharge: MinimumQuantitySurchargeSettings;
 }
 
+/** Feature flags for the shop (e.g. association member pricing). */
+export interface ShopCapabilities {
+  associationFeaturesEnabled: boolean;
+  memberPricingEnabled: boolean;
+  associationMemberListingsEnabled: boolean;
+}
+
 export interface PublicShopSettings {
   id: string;
   state: ShopState;
@@ -91,6 +98,7 @@ export interface PublicShopSettings {
   defaultLanguage: Language;
   customSlug?: string;
   termsUrl?: string;
+  capabilities: ShopCapabilities;
   pricingTaxSettings: PricingTaxSettings;
   orderManagementSettings: OrderManagementSettings;
   checkoutBehaviourSettings: CheckoutBehaviourSettings;
@@ -166,6 +174,8 @@ export interface ProductUserInput {
 export interface PublicShopProduct {
   id: string;
   shopId: string;
+  ownerId: string;
+  ownerType: string;
   categoryId: string;
   displayName: TextTranslation;
   description: TextTranslation;
@@ -281,7 +291,70 @@ export interface CompanyAbout {
   items: CompanyAboutItem[];
 }
 
-/** Aggregate payload from GET /connect/shop, plus company identity. */
+// ---------------------------------------------------------------------------
+// Guest order re-access — GET /shop/orders/public/overview?token=<order:read JWT>
+// (token from placeGuestOrder or the re-auth confirm step). Public, no connect-token.
+// ---------------------------------------------------------------------------
+
+export type OrderState = "PENDING" | "CONFIRMED" | "CANCELLED" | "REFUNDED" | "COMPLETE";
+export type OrderPaymentState = "PENDING" | "PROCESSING" | "REFUNDED" | "PAID" | "FAILED";
+export type OrderDeliveryState =
+  | "PENDING"
+  | "CONFIRMED"
+  | "READY_FOR_PICKUP"
+  | "PICKED_UP"
+  | "SENT"
+  | "CANCELLED"
+  | "RETURNED"
+  | "DELIVERED"
+  | "ISSUED"
+  | "REDEEMED";
+
+export interface OrderLineItem {
+  productId: string;
+  productName: string;
+  variationLabel?: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface ShopOrder {
+  id: string;
+  bundleId: string;
+  orderState: OrderState;
+  items: OrderLineItem[];
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  deliveryPrice: number;
+  paymentState: OrderPaymentState;
+  deliveryState: OrderDeliveryState;
+  currency: Currency;
+  vendorName?: string;
+  notes?: string;
+}
+
+export interface OrderOverview {
+  bundleId: string;
+  bundleOrderNumber?: string;
+  shopId: string;
+  orders: ShopOrder[];
+}
+
+/** Response of POST /shop/orders/public/re-auth/confirm. */
+export interface ReauthConfirmResult {
+  bundleId: string;
+  shopId: string;
+  bundleOrderNumber?: string;
+  accessToken: string;
+  expiresInSeconds: number;
+  hubUrl: string;
+  hubApiUrl: string;
+  overviewApiUrl: string;
+}
+
+/** Aggregate payload from GET /e-shop, plus company identity. */
 export interface PublicShopBundle {
   ownerId: string;
   shopId: string;

@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
+import { placeGuestOrder } from "@/lib/connect";
 
-// Server-only order placement. The public /connect surface is read-only, so the
-// order goes to the me platform endpoint POST /shop/checkout/place-order, which
-// requires an authenticated me-account (Bearer JWT). meshop holds ONE service
-// account token (ME_ORDER_BEARER_TOKEN) and places every guest order as it; the
-// real buyer is captured in the invoice/delivery addresses. The token stays
-// server-side and never reaches the browser.
+// Server-only guest order placement. Forwards to the e-shop guest checkout
+// (POST {SHOP_BASE}/checkout/place-order), authenticated by the server-held
+// connect-token — the buyer is a guest, no account/Bearer token needed. The
+// backend returns { bundleId, accessToken (order:read JWT), hubUrl, ... } which
+// the shopper uses to view and pay the order.
 
 export const dynamic = "force-dynamic";
 
-const BASE = (process.env.CONNECT_API_BASE_URL ?? "http://localhost:5000").replace(/\/$/, "");
-const BEARER = process.env.ME_ORDER_BEARER_TOKEN ?? "";
 const SHOP_ID = process.env.CONNECT_SHOP_ID ?? "";
-const OWNER_ID = process.env.CONNECT_OWNER_ID ?? ""; // backend derives vendor from the shop; sent for contract completeness
-const ASSOCIATION_ID = process.env.ME_ORDER_ASSOCIATION_ID ?? "";
 
 interface OrderItem {
   productId: string;
@@ -45,11 +41,6 @@ interface OrderBody {
 }
 
 export async function POST(req: Request) {
-  if (!BEARER) {
-    console.error("[api/order] ME_ORDER_BEARER_TOKEN is not configured");
-    return NextResponse.json({ error: "order_not_configured" }, { status: 503 });
-  }
-
   let body: OrderBody;
   try {
     body = (await req.json()) as OrderBody;
@@ -61,11 +52,13 @@ export async function POST(req: Request) {
 
   const placeOrderRequest = {
     idempotencyKey: randomUUID(),
-    associationId: ASSOCIATION_ID,
+    // The backend derives the vendor from the shop and resolves any association
+    // itself, so these are left empty (kept only because the contract lists them).
+    associationId: "",
     groups: [
       {
         shopId: SHOP_ID,
-        ownerId: OWNER_ID,
+        ownerId: "",
         paymentProviderId: body.paymentProviderId,
         fulfillmentMode: body.fulfillmentMode,
         deliveryType: body.deliveryType,
@@ -83,27 +76,13 @@ export async function POST(req: Request) {
     notes: body.notes || undefined,
   };
 
-  const res = await fetch(`${BASE}/shop/checkout/place-order`, {
-    method: "POST",
-    // Bearer only — NOT connect-token: isAuth short-circuits on a connect token
-    // and would skip the account the place-order controller needs.
-    headers: { authorization: `Bearer ${BEARER}`, "content-type": "application/json" },
-    body: JSON.stringify(placeOrderRequest),
-    cache: "no-store",
-  });
-
-  const text = await res.text();
-  if (!res.ok) {
-    console.error(`[api/order] place-order -> ${res.status}: ${text}`);
-    let message = "order_failed";
-    try {
-      message = (JSON.parse(text).message as string) || message;
-    } catch {
-      /* keep default */
-    }
-    return NextResponse.json({ error: "order_failed", message }, { status: res.status });
+  try {
+    const result = await placeGuestOrder(placeOrderRequest);
+    return NextResponse.json(result);
+  } catch (err) {
+    const status = (err as { status?: number }).status ?? 502;
+    const message = err instanceof Error ? err.message : "order_failed";
+    console.error(`[api/order] place-order failed (${status}): ${message}`);
+    return NextResponse.json({ error: "order_failed", message }, { status });
   }
-
-  // { bundleId, accessToken, hubUrl, hubApiUrl, orderIds }
-  return NextResponse.json(JSON.parse(text));
 }
